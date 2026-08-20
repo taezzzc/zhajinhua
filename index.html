@@ -720,12 +720,12 @@ function showLocalModal(winner, myPts, lb) {
   const meCards = state.me.cards;
   const meHand = state.me.hand;
   $("modal-title").textContent = winner === "me" ? "🎉 你赢了！" : "😔 " + wName + " 赢了";
-  $("modal-sub").textContent = winner === "me" ? "赢得本局底池" : "再接再厉，下一局翻盘";
+  $("modal-sub").textContent = winner === "me" ? "赢得奖池全部筹码" : "再接再厉，下一局翻盘";
   $("modal-cards").innerHTML =
     `<div class="result-player"><div class="rp-name">我：${meHand ? meHand.name : "—"}</div><div style="display:flex;gap:6px;justify-content:center;">${meCards.map(c => cardHTML(c, true)).join("")}</div></div>` +
     `<div class="result-player"><div class="rp-name">${wName}：${wHand ? wHand.name : "—"}</div><div style="display:flex;gap:6px;justify-content:center;">${wCards.map(c => cardHTML(c, true)).join("")}</div></div>`;
   $("modal-hand").textContent = "牌型：" + (wHand ? wHand.name : "—");
-  $("modal-amt").textContent = "+" + state.pot + " 筹码";
+  $("modal-amt").textContent = "赢得奖池 +" + state.pot + " 筹码";
   $("modal-score").innerHTML = myPts >= 0 ? `积分 <span style="color:#7dff9b">+${myPts}</span> · 总分 ${lb.score}` : `积分 <span style="color:#ff8a8a">${myPts}</span> · 总分 ${lb.score}`;
   state.round++;
   $("modal").classList.add("show");
@@ -772,6 +772,12 @@ function compareTarget(id) {
   for (let i = 1; i < scores.length; i++) if (scores[i] < scores[minIdx]) minIdx = i;
   return alive[minIdx];
 }
+/* 人机模式：玩家点击比牌弹窗中的目标后执行（目标自选） */
+function localPickCompare(targetId) {
+  $("compare-modal").classList.remove("show");
+  if (state.phase !== "betting" || state.current !== "me") return;
+  localDoCompare("me", targetId);
+}
 
 /* ========== 人机事件 ========== */
 $("btn-start").addEventListener("click", () => { $("modal").classList.remove("show"); startLocalRound(); });
@@ -794,7 +800,16 @@ $("btn-raise").addEventListener("click", () => {
   const ok = localDoRaise("me", target); if (!ok) return;
   setMsg("你加注了！当前注 " + state.callAmount); renderLocal(); localNextTurn();
 });
-$("btn-compare").addEventListener("click", () => { if (state.phase !== "betting" || state.current !== "me") return; localDoCompare("me", compareTarget("me")); });
+$("btn-compare").addEventListener("click", () => {
+  if (state.phase !== "betting" || state.current !== "me") return;
+  const targets = localAlive().filter(x => x !== "me");
+  if (targets.length === 0) return;
+  if (targets.length === 1) { localDoCompare("me", targets[0]); return; }
+  $("compare-options").innerHTML = targets.map(t =>
+    `<button class="btn" style="width:80%;margin:6px auto;display:block;" onclick="localPickCompare('${t}');">${localPlayer(t).name}</button>`
+  ).join("");
+  $("compare-modal").classList.add("show");
+});
 $("btn-fold").addEventListener("click", () => { if (state.phase !== "betting" || state.current !== "me") return; localDoFold("me"); });
 $("local-bet-input").addEventListener("input", () => { $("local-bet-input").dataset.touched = "1"; });
 $("local-bet-min").addEventListener("click", () => { $("local-bet-input").value = costFor("me"); $("local-bet-input").dataset.touched = "1"; });
@@ -1126,6 +1141,10 @@ function showdown(winnerSeat, winnerName) {
   ol.phase = "showdown";
   ol.current = -1;
   ol.winner = winnerSeat;
+  // 奖池全部筹码归赢家
+  if (winnerSeat !== null && winnerSeat !== undefined && winnerSeat >= 0 && ol.players[winnerSeat]) {
+    ol.players[winnerSeat].chips += ol.pot;
+  }
   // 积分
   const winPts = Math.max(1, Math.round(ol.pot / ol.stake));
   const results = ol.players.map(p => {
@@ -1136,7 +1155,8 @@ function showdown(winnerSeat, winnerName) {
   });
   const board = loadOnlineBoard();
   addOnlineGame(results, winnerName, ol.pot, ol.stake);
-  olBroadcast({ type: "showdown", results, pot: ol.pot, winnerSeat, winnerName, board: loadOnlineBoard() });
+  const winnerChips = (winnerSeat !== null && winnerSeat !== undefined && winnerSeat >= 0 && ol.players[winnerSeat]) ? ol.players[winnerSeat].chips : 0;
+  olBroadcast({ type: "showdown", results, pot: ol.pot, winnerSeat, winnerName, winnerChips, board: loadOnlineBoard() });
   renderOnlineRoom();
 }
 
@@ -1202,6 +1222,10 @@ function handleGuestMessage(data) {
   } else if (data.type === "showdown") {
     ol.phase = "showdown";
     ol.winner = data.winnerSeat;
+    if (data.winnerSeat !== null && data.winnerSeat !== undefined && data.winnerSeat >= 0 && data.winnerChips !== undefined) {
+      const w = ol.players.find(x => x.seat === data.winnerSeat);
+      if (w) w.chips = data.winnerChips;
+    }
     showOnlineModal(data);
   } else if (data.type === "new_round") {
     ol.round = data.round;
@@ -1336,7 +1360,7 @@ function showOnlineModal(data) {
   $("ol-modal-cards").innerHTML = data.results.map(r =>
     `<div class="result-player"><div class="rp-name">${r.name}${r.winner ? " 🏆" : ""}：${r.hand.name}</div><div style="display:flex;gap:6px;justify-content:center;">${r.cards.map(c => cardHTML(c, true, true)).join("")}</div><div class="score-change" style="font-size:13px;">${r.pts >= 0 ? `<span style="color:#7dff9b">+${r.pts} 分</span>` : `<span style="color:#ff8a8a">${r.pts} 分</span>`}</div></div>`
   ).join("");
-  $("ol-modal-amt").textContent = "底池 " + data.pot + " 筹码";
+  $("ol-modal-amt").textContent = "奖池 " + data.pot + " 筹码 · " + data.winnerName + " 赢得全部奖池";
   const meR = data.results.find(r => r.seat === ol.mySeat);
   if (meR) $("ol-modal-score").innerHTML = meR.pts >= 0 ? `本局积分 <span style="color:#7dff9b">+${meR.pts}</span>` : `本局积分 <span style="color:#ff8a8a">${meR.pts}</span>`;
   // 显示按钮
