@@ -169,7 +169,7 @@ body {
   <div class="screen show" id="screen-menu">
     <div class="menu-inner">
       <div class="logo">🃏 炸金花</div>
-      <div class="menu-sub">支持 3-10 人在线联机 · 积分累积</div>
+      <div class="menu-sub">3-10 人在线联机 · 自定义房间码 · 赢家轮庄 · 暗拍跟注 · 积分累积</div>
       <button class="menu-btn primary" id="menu-local">🤖 人机对战</button>
       <button class="menu-btn online" id="menu-online">🌐 联机对战</button>
       <button class="menu-btn score" id="menu-score">🏆 积分榜</button>
@@ -228,7 +228,7 @@ body {
       <input type="range" id="stake-range" min="5" max="50" step="5" value="10">
       <span class="val" id="stake-label">10</span><span>元</span>
     </div>
-    <div class="hint">豹子 &gt; 同花顺 &gt; 金花 &gt; 顺子 &gt; 对子 &gt; 单张 ｜ 未看牌跟注半价 ｜ 235 吃豹子</div>
+    <div class="hint">豹子 &gt; 同花顺 &gt; 金花 &gt; 顺子 &gt; 对子 &gt; 单张 ｜ 235 吃豹子<br>暗拍规则：上家暗牌压X，你明牌跟 2X、暗牌跟 X/2（不低于底注一半）｜ 赢家下局末位行动</div>
   </div>
 
   <!-- 联机对战 -->
@@ -242,15 +242,20 @@ body {
     <div id="ol-lobby">
       <div class="ol-card">
         <h3>🎲 创建房间</h3>
-        <p style="font-size:12px;color:#bcd9c5;margin-bottom:6px;">创建房间并邀请好友加入（3-10人）</p>
-        <button class="btn primary" id="ol-create">创建房间</button>
+        <p style="font-size:12px;color:#bcd9c5;margin-bottom:6px;">自定义房间码（4-8位字母/数字），留空则随机生成（3-10人）</p>
+        <input id="ol-code-create" placeholder="自定义房间码（4-8位）" maxlength="8" autocomplete="off" style="letter-spacing:3px;">
+        <div style="display:flex;gap:8px;justify-content:center;">
+          <button class="btn" id="ol-code-random" style="width:130px;">🎲 随机生成</button>
+          <button class="btn primary" id="ol-create" style="width:130px;">创建房间</button>
+        </div>
       </div>
       <div class="ol-card">
         <h3>🔑 加入房间</h3>
         <p style="font-size:12px;color:#bcd9c5;margin-bottom:8px;">输入好友分享的房间码</p>
-        <input id="ol-code-input" placeholder="房间码" maxlength="4" autocomplete="off">
+        <input id="ol-code-input" placeholder="房间码（4-8位）" maxlength="8" autocomplete="off">
         <button class="btn" id="ol-join">加入房间</button>
       </div>
+      <div class="hint">暗拍规则：上家暗牌压X，明牌跟 2X、暗牌跟 X/2（不低于底注一半）｜ 每局赢家下局末位行动（轮庄）</div>
     </div>
     <!-- 房间（等待+游戏） -->
     <div id="ol-room" style="display:none;">
@@ -456,7 +461,8 @@ const state = {
   me: { cards: [], hand: null, chips: 1000, folded: false, looked: false },
   ai: { cards: [], hand: null, chips: 1000, folded: false, looked: false },
   pot: 0, stake: 10, round: 1, current: "me", callAmount: 10,
-  meInvested: 0, aiInvested: 0, winner: null, lock: false
+  meInvested: 0, aiInvested: 0, winner: null, lock: false,
+  lastActorDark: false, lastActorBet: 0
 };
 
 function renderLocal() {
@@ -505,15 +511,25 @@ function renderLocalActions() {
   $("btn-fold").disabled = !myTurn;
   $("btn-start").disabled = betting || state.phase === "showdown";
   $("btn-look").textContent = "看牌";
-  $("btn-call").textContent = looked ? ("跟注 " + state.callAmount) : ("跟注 " + Math.max(1, Math.ceil(state.callAmount / 2)));
-  $("btn-raise").textContent = "加注";
-  $("btn-compare").textContent = "比牌";
+  const myCost = costFor("me");
+  $("btn-call").textContent = looked ? ("看牌跟注 " + myCost) : ("暗牌跟注 " + myCost);
+  $("btn-raise").textContent = "加注 至 " + (state.callAmount * 2);
+  $("btn-compare").textContent = "比牌 " + myCost;
   $("btn-fold").textContent = "弃牌";
   $("btn-start").textContent = "开始新一局";
 }
 
 function setMsg(t, small) { $("msg").textContent = t; $("msg").className = "msg" + (small ? " small" : ""); }
-function costFor(player) { return state[player].looked ? state.callAmount : Math.max(1, Math.ceil(state.callAmount / 2)); }
+/* 跟注金额：上家暗牌压 X → 看牌跟 2X、暗牌跟 X/2（向下取整，最低底注一半）；上家明牌沿用原规则 */
+function costFor(player) {
+  const looked = state[player].looked;
+  if (state.lastActorDark) {
+    if (looked) return 2 * state.lastActorBet;
+    return Math.max(Math.floor(state.lastActorBet / 2), Math.floor(state.stake / 2));
+  }
+  return looked ? state.callAmount : Math.max(1, Math.ceil(state.callAmount / 2));
+}
+function localRecordBet(player, cost) { state.lastActorDark = state[player].looked; state.lastActorBet = cost; }
 
 function startLocalRound() {
   if (state.lock) return;
@@ -525,6 +541,7 @@ function startLocalRound() {
   state.me = { ...state.me, cards: [], hand: null, folded: false, looked: false };
   state.ai = { ...state.ai, cards: [], hand: null, folded: false, looked: false };
   state.pot = 0; state.meInvested = 0; state.aiInvested = 0;
+  const prevWinner = state.winner;
   state.winner = null; state.callAmount = state.stake;
   state.me.cards = [state.deck.pop(), state.deck.pop(), state.deck.pop()];
   state.ai.cards = [state.deck.pop(), state.deck.pop(), state.deck.pop()];
@@ -535,11 +552,14 @@ function startLocalRound() {
   state.me.chips -= meFee; state.meInvested += meFee;
   state.ai.chips -= aiFee; state.aiInvested += aiFee;
   state.pot = meFee + aiFee;
-  state.current = "me";
-  $("round-info").textContent = `第 ${state.round} 局 ｜ 底注 ${state.stake} ｜ 当前注 ${state.callAmount}`;
-  setMsg("发牌完成，轮到你了。先看牌或跟注（未看牌跟注半价）");
+  // 赢家轮庄：上局赢家本局末位行动，其余按座位顺序依次行动（人机：赢家是"我"则电脑先动）
+  state.current = prevWinner === "me" ? "ai" : "me";
+  state.lastActorDark = false; state.lastActorBet = state.callAmount;
+  $("round-info").textContent = `第 ${state.round} 局 ｜ 底注 ${state.stake} ｜ 当前注 ${state.callAmount}${prevWinner ? " ｜ 上局赢家：我，本局后手" : ""}`;
+  setMsg("发牌完成，轮到你了。先看牌或跟注（暗拍跟注可压上家半价）");
   renderLocal();
   state.lock = false;
+  if (state.current === "ai") aiTurn();
 }
 
 function localDoCall(player) {
@@ -548,6 +568,7 @@ function localDoCall(player) {
   if (p.chips < cost) { setMsg("筹码不足，无法跟注"); return false; }
   p.chips -= cost; state.pot += cost;
   if (player === "me") state.meInvested += cost; else state.aiInvested += cost;
+  localRecordBet(player, cost);
   return true;
 }
 function localDoRaise(player) {
@@ -562,6 +583,7 @@ function localDoRaise(player) {
   p.chips -= cost; state.pot += cost;
   if (player === "me") state.meInvested += cost; else state.aiInvested += cost;
   state.callAmount = newCall;
+  localRecordBet(player, cost);
   return true;
 }
 function localEndRound(winner) {
@@ -591,6 +613,7 @@ function localDoCompare(player) {
   if (p.chips < fee) { setMsg("筹码不足，无法比牌"); return false; }
   p.chips -= fee; state.pot += fee;
   if (player === "me") state.meInvested += fee; else state.aiInvested += fee;
+  localRecordBet(player, fee);
   const result = compareHands(state.me.hand, state.me.cards, state.ai.hand, state.ai.cards);
   const loser = result >= 0 ? "ai" : "me";
   state[loser].folded = true;
@@ -667,13 +690,27 @@ const ol = {
   peer: null, conns: [], isHost: false, roomCode: "", myName: "玩家", mySeat: -1,
   players: [], cards: {}, myCards: [],
   pot: 0, callAmount: 0, current: -1, phase: "lobby", round: 1, stake: 10,
-  lock: false, hostConn: null, heartTimer: null
+  lock: false, hostConn: null, heartTimer: null,
+  lastActorDark: false, lastActorBet: 0
 };
 
 function olSeat(seat) { return ol.players.find(p => p.seat === seat); }
 function olAlive() { return ol.players.filter(p => !p.folded && !p.out); }
 function olActiveCount() { return olAlive().length; }
-function olCostFor(p) { return p.looked ? ol.callAmount : Math.max(1, Math.ceil(ol.callAmount / 2)); }
+/* 跟注金额：上家暗牌压 X → 看牌跟 2X、暗牌跟 X/2（向下取整，最低底注一半）；上家明牌沿用原规则 */
+function olCostFor(p) {
+  const looked = p.looked;
+  if (ol.lastActorDark) {
+    if (looked) return 2 * ol.lastActorBet;
+    return Math.max(Math.floor(ol.lastActorBet / 2), Math.floor(ol.stake / 2));
+  }
+  return looked ? ol.callAmount : Math.max(1, Math.ceil(ol.callAmount / 2));
+}
+function olRecordBet(seat, cost) {
+  const p = ol.players[seat];
+  if (!p) return;
+  ol.lastActorDark = p.looked; ol.lastActorBet = cost;
+}
 
 function olBroadcast(obj, except) {
   ol.conns.forEach(c => { if (c.open && c.peer !== except) { try { c.send(obj); } catch (e) {} } });
@@ -684,64 +721,89 @@ function olPublicState() {
     type: "state",
     players: ol.players.map(p => ({ seat: p.seat, name: p.name, chips: p.chips, folded: p.folded, out: p.out, online: p.online, looked: p.looked, invested: p.invested })),
     pot: ol.pot, callAmount: ol.callAmount, current: ol.current, phase: ol.phase,
-    round: ol.round, stake: ol.stake, winner: ol.winner, lastAction: ol.lastAction
+    round: ol.round, stake: ol.stake, winner: ol.winner, lastAction: ol.lastAction,
+    lastActorDark: ol.lastActorDark, lastActorBet: ol.lastActorBet
   };
 }
 
-/* ---- 创建房间 ---- */
-function createRoom() {
+/* ---- 创建房间（支持自定义房间码） ---- */
+function createRoom(customCode) {
   cleanupOnline();
   if (typeof Peer === "undefined") { toast("联机库加载失败（需联网），已切换人机模式"); showScreen("screen-local"); renderLocal(); return; }
+  let userCode = "";
+  if (customCode !== undefined) {
+    userCode = String(customCode).trim().toUpperCase().replace(/\s+/g, "");
+    if (!/^[A-Z0-9]{4,8}$/.test(userCode)) { toast("房间码需为4-8位字母或数字"); return; }
+  }
   $("ol-status").textContent = "正在连接服务器…";
   $("ol-room").style.display = "none";
   $("ol-lobby").style.display = "block";
-  let code = genCode(4);
-  const peer = new Peer("zzhj-" + code);
-  peer.on("open", id => {
-    ol.isHost = true;
-    ol.roomCode = code;
-    ol.peer = peer;
-    ol.players = [{ seat: 0, name: "玩家1", chips: 1000, folded: false, out: false, online: true, looked: false, invested: 0 }];
-    ol.mySeat = 0;
-    $("ol-lobby").style.display = "none";
-    $("ol-room").style.display = "block";
-    $("ol-code-show").textContent = code;
-    $("ol-role").textContent = "房主";
-    $("ol-status").textContent = "等待玩家加入…";
-    toast("房间已创建，房间码：" + code);
-    renderOnlineRoom();
-  });
-  peer.on("connection", conn => {
-    conn.on("data", data => handleHostMessage(conn, data));
-    conn.on("close", () => handleHostLeave(conn));
-    conn.on("error", () => handleHostLeave(conn));
-  });
-  peer.on("error", err => {
-    if (err.type === "unavailable-id") {
-      // 房间码冲突，换一个重试
-      code = genCode(4);
-      peer.destroy();
-      toast("房间码冲突，正在重试…");
-      setTimeout(() => { if (!$("screen-online").classList.contains("show")) return; const p2 = new Peer("zzhj-" + code); p2.on("open", id => { /* 复用流程 */ }); }, 300);
-      // 简化处理：直接提示
-      cleanupOnline();
-      toast("创建房间失败，请重试或检查网络");
-      $("ol-status").textContent = "连接失败";
-    } else if (err.type === "network" || err.type === "server-error" || err.type === "socket-error" || err.type === "socket-closed") {
-      cleanupOnline();
-      toast("无法连接联机服务器，已切换人机模式");
-      showScreen("screen-local");
-      renderLocal();
-    }
-  });
+  let code = userCode || genCode(4);
+  let retry = 0;
+  const showLobbyBack = () => {
+    $("ol-lobby").style.display = "block";
+    $("ol-room").style.display = "none";
+    $("ol-status").textContent = "";
+  };
+  const tryCreate = () => {
+    const peer = new Peer("zzhj-" + code);
+    peer.on("open", id => {
+      ol.isHost = true;
+      ol.roomCode = code;
+      ol.peer = peer;
+      ol.players = [{ seat: 0, name: "玩家1", chips: 1000, folded: false, out: false, online: true, looked: false, invested: 0 }];
+      ol.mySeat = 0;
+      $("ol-lobby").style.display = "none";
+      $("ol-room").style.display = "block";
+      $("ol-code-show").textContent = code;
+      $("ol-role").textContent = "房主";
+      $("ol-status").textContent = "等待玩家加入…";
+      toast("房间已创建，房间码：" + code);
+      renderOnlineRoom();
+    });
+    peer.on("connection", conn => {
+      conn.on("data", data => handleHostMessage(conn, data));
+      conn.on("close", () => handleHostLeave(conn));
+      conn.on("error", () => handleHostLeave(conn));
+    });
+    peer.on("error", err => {
+      if (err.type === "unavailable-id") {
+        // 房间码已被占用
+        try { peer.destroy(); } catch (e) {}
+        if (userCode) {
+          cleanupOnline();
+          toast("房间码 " + code + " 已被占用，请换一个或点击随机生成");
+          showLobbyBack();
+          return;
+        }
+        if (retry < 3) {
+          retry++;
+          code = genCode(4);
+          toast("房间码冲突，正在重试…");
+          tryCreate();
+        } else {
+          cleanupOnline();
+          toast("创建房间失败，请重试或检查网络");
+          $("ol-status").textContent = "连接失败";
+          showLobbyBack();
+        }
+      } else if (err.type === "network" || err.type === "server-error" || err.type === "socket-error" || err.type === "socket-closed") {
+        cleanupOnline();
+        toast("无法连接联机服务器，已切换人机模式");
+        showScreen("screen-local");
+        renderLocal();
+      }
+    });
+  };
+  tryCreate();
 }
 
 /* ---- 加入房间 ---- */
 function joinRoom() {
   cleanupOnline();
   if (typeof Peer === "undefined") { toast("联机库加载失败（需联网），已切换人机模式"); showScreen("screen-local"); renderLocal(); return; }
-  const code = $("ol-code-input").value.trim().toUpperCase();
-  if (!/^[A-Z0-9]{4}$/.test(code)) { toast("请输入4位房间码"); return; }
+  const code = $("ol-code-input").value.trim().toUpperCase().replace(/\s+/g, "");
+  if (!/^[A-Z0-9]{4,8}$/.test(code)) { toast("请输入4-8位房间码"); return; }
   $("ol-status").textContent = "正在连接房间 " + code + "…";
   const peer = new Peer(); // 随机ID
   peer.on("open", id => {
@@ -819,6 +881,7 @@ function handleHostAction(conn, data) {
     if (p.chips < cost) { conn.send({ type: "err", msg: "筹码不足" }); return; }
     p.chips -= cost; p.invested += cost; ol.pot += cost;
     ol.lastAction = p.name + " 跟注 " + cost;
+    olRecordBet(data.seat, cost);
     advanceTurn();
   } else if (act === "raise") {
     let newCall = ol.callAmount * 2;
@@ -830,6 +893,7 @@ function handleHostAction(conn, data) {
     p.chips -= cost; p.invested += cost; ol.pot += cost;
     ol.callAmount = newCall;
     ol.lastAction = p.name + " 加注至 " + newCall;
+    olRecordBet(data.seat, cost);
     advanceTurn();
   } else if (act === "compare") {
     const target = data.target;
@@ -838,6 +902,7 @@ function handleHostAction(conn, data) {
     const fee = olCostFor(p);
     if (p.chips < fee) { conn.send({ type: "err", msg: "筹码不足" }); return; }
     p.chips -= fee; p.invested += fee; ol.pot += fee;
+    olRecordBet(p.seat, fee);
     const ph = evaluateHand(ol.cards[p.seat]);
     const th = evaluateHand(ol.cards[target]);
     const res = compareHands(ph, ol.cards[p.seat], th, ol.cards[target]);
@@ -895,6 +960,7 @@ function hostStartGame() {
   ol.players.forEach(p => { p.chips = 1000; p.folded = false; p.out = false; p.looked = false; p.invested = 0; });
   ol.cards = {};
   ol.pot = 0; ol.callAmount = 10; ol.current = 0;
+  ol.lastActorDark = false; ol.lastActorBet = ol.callAmount;
   deal();
 }
 
@@ -938,13 +1004,17 @@ function showdown(winnerSeat, winnerName) {
 }
 
 function hostNextRound() {
+  // 赢家轮庄：上局赢家本局末位行动，其余按座位顺序依次行动（首行动者=赢家的下一位）
+  const prevWinner = ol.winner;
   ol.phase = "betting";
   ol.round++;
   ol.players.forEach(p => { p.chips = 1000; p.folded = false; p.out = false; p.looked = false; p.invested = 0; });
   ol.cards = {};
-  ol.pot = 0; ol.callAmount = 10; ol.current = 0;
+  ol.pot = 0; ol.callAmount = 10;
+  ol.current = (prevWinner !== null && prevWinner !== undefined && prevWinner >= 0) ? (prevWinner + 1) % ol.players.length : 0;
+  ol.lastActorDark = false; ol.lastActorBet = ol.callAmount;
   ol.winner = null;
-  ol.lastAction = "第 " + ol.round + " 局开始";
+  ol.lastAction = "第 " + ol.round + " 局开始" + (prevWinner !== null && prevWinner !== undefined && prevWinner >= 0 ? "（上局赢家" + ol.players[prevWinner].name + "本局末位行动）" : "");
   olBroadcast({ type: "new_round", round: ol.round });
   deal();
 }
@@ -1011,6 +1081,8 @@ function applyPublicState(st) {
   });
   ol.pot = st.pot; ol.callAmount = st.callAmount; ol.current = st.current; ol.phase = st.phase;
   ol.round = st.round; ol.stake = st.stake; ol.winner = st.winner; ol.lastAction = st.lastAction;
+  ol.lastActorDark = st.lastActorDark !== undefined ? st.lastActorDark : false;
+  ol.lastActorBet = st.lastActorBet !== undefined ? st.lastActorBet : 0;
 }
 
 /* ---- 联机 UI 渲染 ---- */
@@ -1088,9 +1160,10 @@ function renderOnlineRoom() {
   $("ol-btn-raise").disabled = !myTurn;
   $("ol-btn-compare").disabled = !(myTurn && olAlive().filter(p => p.seat !== ol.mySeat).length > 0);
   $("ol-btn-fold").disabled = !myTurn;
-  $("ol-btn-call").textContent = myLooked ? ("跟注 " + ol.callAmount) : ("跟注 " + Math.max(1, Math.ceil(ol.callAmount / 2)));
-  $("ol-btn-raise").textContent = "加注";
-  $("ol-btn-compare").textContent = "比牌";
+  const myCost = me && ol.phase === "betting" ? olCostFor(me) : 0;
+  $("ol-btn-call").textContent = myLooked ? ("看牌跟注 " + myCost) : ("暗牌跟注 " + myCost);
+  $("ol-btn-raise").textContent = "加注 至 " + (ol.callAmount * 2);
+  $("ol-btn-compare").textContent = "比牌 " + myCost;
   $("ol-btn-fold").textContent = "弃牌";
   $("ol-btn-look").textContent = "看牌";
   if (ol.phase === "showdown") { ["ol-btn-look","ol-btn-call","ol-btn-raise","ol-btn-compare","ol-btn-fold"].forEach(id => $(id).style.display = "none"); }
@@ -1129,7 +1202,10 @@ function cleanupOnline() {
 
 /* ---- 联机事件 ---- */
 $("menu-online").addEventListener("click", () => { showScreen("screen-online"); $("ol-lobby").style.display = "block"; $("ol-room").style.display = "none"; $("ol-status").textContent = ""; });
-$("ol-create").addEventListener("click", createRoom);
+$("ol-create").addEventListener("click", () => createRoom($("ol-code-create").value));
+$("ol-code-random").addEventListener("click", () => { $("ol-code-create").value = genCode(4); });
+$("ol-code-create").addEventListener("input", e => { e.target.value = e.target.value.toUpperCase().replace(/\s+/g, ""); });
+$("ol-code-input").addEventListener("input", e => { e.target.value = e.target.value.toUpperCase().replace(/\s+/g, ""); });
 $("ol-join").addEventListener("click", joinRoom);
 $("ol-back").addEventListener("click", () => { cleanupOnline(); showScreen("screen-menu"); updateMenuStats(); });
 $("ol-btn-start").addEventListener("click", hostStartGame);
