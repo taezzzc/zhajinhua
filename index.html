@@ -1,0 +1,1198 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>炸金花小游戏</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; }
+body {
+  font-family: "Microsoft YaHei", "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  background: radial-gradient(ellipse at center, #1a5c3a 0%, #0f3d26 55%, #082518 100%);
+  color: #f5f0dc;
+  min-height: 100vh;
+  user-select: none;
+  overflow-x: hidden;
+}
+#app { max-width: 900px; margin: 0 auto; padding: 12px 10px 20px; min-height: 100vh; }
+
+/* 屏幕切换 */
+.screen { display: none; }
+.screen.show { display: block; }
+
+/* 主菜单 */
+.menu-inner { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 90vh; gap: 14px; text-align: center; }
+.menu-inner .logo { font-size: 44px; letter-spacing: 3px; color: #ffd76a; text-shadow: 0 4px 12px rgba(0,0,0,.6); margin-bottom: 6px; }
+.menu-inner .menu-sub { font-size: 14px; color: #bcd9c5; margin-bottom: 18px; }
+.menu-btn { width: 260px; padding: 16px 10px; font-size: 17px; border: none; border-radius: 14px; font-weight: bold; cursor: pointer; color: #fff; background: #45608c; transition: transform .1s, opacity .2s; }
+.menu-btn:active { transform: scale(0.97); }
+.menu-btn.primary { background: #f9a825; color: #3e2723; }
+.menu-btn.online { background: #00897b; }
+.menu-btn.score { background: #6a4f9e; }
+.menu-stats { font-size: 12px; color: #9fc7ad; line-height: 1.7; margin-top: 10px; }
+
+/* 顶栏 */
+.topbar { display: flex; justify-content: space-between; align-items: center; padding: 8px 4px 12px; }
+.topbar h1 { font-size: 22px; letter-spacing: 2px; color: #ffd76a; text-shadow: 0 2px 6px rgba(0,0,0,.5); }
+.topbar-left { display: flex; align-items: center; gap: 8px; }
+.btn.small { padding: 6px 10px; font-size: 12px; border-radius: 8px; border: none; cursor: pointer; color: #fff; background: rgba(255,255,255,.15); font-weight: bold; }
+.room-info { display: flex; flex-direction: column; align-items: flex-end; font-size: 12px; color: #bcd9c5; line-height: 1.5; }
+.room-info b { color: #ffd76a; }
+
+/* 玩家区域（人机） */
+.players { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.player-box { flex: 1; background: rgba(0,0,0,0.28); border: 2px solid rgba(255,255,255,0.12); border-radius: 14px; padding: 8px; position: relative; min-height: 118px; transition: border-color .2s; }
+.player-box.active { border-color: #ffd76a; box-shadow: 0 0 14px rgba(255,215,106,.25); }
+.player-box.winner { border-color: #7dff9b; box-shadow: 0 0 16px rgba(125,255,155,.35); }
+.player-box.loser { opacity: .55; }
+.player-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.avatar { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: bold; flex-shrink: 0; }
+.avatar.me { background: #3a7bd5; }
+.avatar.ai { background: #c0392b; }
+.player-name { font-size: 14px; font-weight: bold; }
+.badge { font-size: 10px; padding: 1px 6px; border-radius: 8px; background: rgba(255,215,106,.2); color: #ffd76a; margin-left: 4px; }
+.chips-line { font-size: 13px; color: #ffd76a; margin-left: auto; font-weight: bold; }
+.status-line { font-size: 12px; color: #bcd9c5; min-height: 16px; margin-top: 2px; }
+
+/* 牌区 */
+.cards-area { display: flex; gap: 6px; margin-top: 4px; justify-content: center; }
+.card { width: 62px; height: 90px; border-radius: 8px; background: #fdfdf6; color: #222; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 24px; font-weight: bold; box-shadow: 0 3px 8px rgba(0,0,0,.4); position: relative; }
+.card.red { color: #d33; }
+.card.black { color: #222; }
+.card.back { background: repeating-linear-gradient(45deg, #2c5fa8, #2c5fa8 6px, #3a74c0 6px, #3a74c0 12px); color: transparent; }
+.card.back::after { content: "★"; color: rgba(255,255,255,.55); font-size: 22px; }
+.card .corner { font-size: 13px; line-height: 1; }
+.card .big { font-size: 28px; line-height: 1.1; }
+.card.sm { width: 46px; height: 66px; font-size: 17px; }
+.card.sm .corner { font-size: 10px; }
+.card.sm .big { font-size: 20px; }
+.card.sm.back::after { font-size: 16px; }
+
+/* 桌面中央 */
+.table-center { background: rgba(0,0,0,0.22); border-radius: 18px; padding: 12px; margin: 8px 0; text-align: center; position: relative; border: 2px dashed rgba(255,255,255,0.10); }
+.pot-area { font-size: 22px; font-weight: bold; color: #ffe9a8; margin: 4px 0 8px; }
+.pot-area small { font-size: 13px; color: #bcd9c5; margin-right: 6px; }
+.round-info { font-size: 13px; color: #bcd9c5; margin-bottom: 8px; }
+.round-info b { color: #ffd76a; }
+.msg { font-size: 16px; min-height: 24px; color: #fff; font-weight: bold; margin: 4px 0; }
+.msg.small { font-size: 13px; font-weight: normal; color: #cfe5d6; }
+.ai-think { font-size: 12px; color: #9fc7ad; min-height: 16px; }
+
+/* 操作按钮 */
+.actions { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 8px 0; }
+.btn { padding: 12px 4px; border: none; border-radius: 12px; font-size: 15px; font-weight: bold; cursor: pointer; color: #fff; transition: transform .1s, opacity .2s; background: #45608c; }
+.btn:active { transform: scale(0.96); }
+.btn:disabled { opacity: .35; cursor: not-allowed; }
+.btn.look { background: #2e7d32; }
+.btn.call { background: #1565c0; }
+.btn.raise { background: #e65100; }
+.btn.compare { background: #8e24aa; }
+.btn.fold { background: #b71c1c; }
+.btn.primary { background: #f9a825; color: #3e2723; }
+
+/* 底注条 */
+.stake-bar { display: flex; align-items: center; gap: 8px; margin: 6px 0; font-size: 13px; }
+.stake-bar input[type="range"] { flex: 1; accent-color: #ffd76a; }
+.stake-bar .val { color: #ffd76a; font-weight: bold; min-width: 52px; text-align: center; }
+
+/* 联机 */
+.ol-top { display: flex; align-items: center; gap: 10px; padding: 8px 4px 12px; }
+.ol-top .ol-title { font-size: 20px; font-weight: bold; color: #ffd76a; letter-spacing: 1px; }
+.ol-top .ol-status { margin-left: auto; font-size: 12px; color: #9fc7ad; }
+.ol-card { background: rgba(0,0,0,0.28); border: 2px solid rgba(255,255,255,0.12); border-radius: 14px; padding: 18px; margin: 12px 0; text-align: center; }
+.ol-card h3 { font-size: 16px; margin-bottom: 12px; color: #ffe9a8; }
+.ol-card input { width: 180px; padding: 12px; font-size: 24px; text-align: center; letter-spacing: 6px; border: 2px solid rgba(255,255,255,.25); border-radius: 10px; background: rgba(255,255,255,.08); color: #ffd76a; outline: none; text-transform: uppercase; }
+.ol-card .btn { margin-top: 12px; width: 200px; }
+.room-code-bar { display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 14px; color: #bcd9c5; margin: 8px 0; }
+.room-code-bar b { font-size: 26px; letter-spacing: 5px; color: #ffd76a; }
+.room-code-bar .role-tag { font-size: 11px; padding: 2px 8px; border-radius: 8px; background: rgba(255,215,106,.2); color: #ffd76a; }
+.ol-players { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+.ol-seat { flex: 1 1 22%; min-width: 168px; background: rgba(0,0,0,0.28); border: 2px solid rgba(255,255,255,0.12); border-radius: 14px; padding: 8px; position: relative; }
+.ol-seat.active { border-color: #ffd76a; box-shadow: 0 0 14px rgba(255,215,106,.25); }
+.ol-seat.winner { border-color: #7dff9b; box-shadow: 0 0 16px rgba(125,255,155,.35); }
+.ol-seat.offline { opacity: .5; }
+.ol-seat .seat-head { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+.ol-seat .seat-name { font-size: 13px; font-weight: bold; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ol-seat .seat-chips { font-size: 12px; color: #ffd76a; margin-left: auto; font-weight: bold; }
+.ol-seat .seat-status { font-size: 11px; color: #bcd9c5; min-height: 14px; }
+.ol-empty { color: #5d7d68; font-size: 12px; text-align: center; padding: 20px 0; border: 1px dashed rgba(255,255,255,.15); border-radius: 14px; }
+
+/* 弹窗 */
+.modal-mask { position: fixed; inset: 0; background: rgba(0,0,0,.65); display: none; align-items: center; justify-content: center; z-index: 100; padding: 16px; }
+.modal-mask.show { display: flex; }
+.modal { background: linear-gradient(160deg, #2b5d43, #173c28); border: 2px solid #ffd76a; border-radius: 18px; padding: 22px 18px; width: 100%; max-width: 400px; text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,.6); max-height: 85vh; overflow-y: auto; }
+.modal h2 { color: #ffd76a; font-size: 24px; margin-bottom: 6px; }
+.modal .sub { font-size: 14px; color: #bcd9c5; margin-bottom: 12px; }
+.modal .result-cards { display: flex; gap: 10px; justify-content: center; margin: 10px 0; flex-wrap: wrap; }
+.result-player { flex: 1 1 45%; min-width: 150px; }
+.result-player .rp-name { font-size: 13px; color: #bcd9c5; margin-bottom: 4px; }
+.result-player .rp-hand { font-size: 14px; font-weight: bold; color: #ffe9a8; margin: 6px 0; }
+.modal .win-amt { font-size: 26px; font-weight: bold; color: #7dff9b; margin: 6px 0; }
+.modal .score-change { font-size: 15px; font-weight: bold; margin: 4px 0; }
+.modal .btn-row { display: flex; gap: 10px; justify-content: center; margin-top: 14px; flex-wrap: wrap; }
+.modal .btn-row .btn { padding: 10px 16px; font-size: 14px; }
+
+/* 积分榜 */
+.score-table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 14px; }
+.score-table th, .score-table td { padding: 8px 6px; border-bottom: 1px solid rgba(255,255,255,.12); }
+.score-table th { color: #ffd76a; font-size: 12px; }
+.score-table .rank1 { color: #ffd76a; font-weight: bold; }
+.history-list { text-align: left; font-size: 12px; color: #bcd9c5; max-height: 180px; overflow-y: auto; padding: 4px 2px; }
+.history-list div { padding: 3px 0; border-bottom: 1px dashed rgba(255,255,255,.08); }
+.history-list .pos { color: #7dff9b; }
+.history-list .neg { color: #ff8a8a; }
+
+/* Toast */
+#toast { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,.85); color: #fff; padding: 10px 18px; border-radius: 10px; font-size: 14px; z-index: 200; display: none; max-width: 90vw; text-align: center; border: 1px solid rgba(255,215,106,.4); }
+.hint { font-size: 12px; color: #8fae99; text-align: center; margin-top: 6px; line-height: 1.6; }
+
+@media (max-width: 480px) {
+  .card { width: 52px; height: 78px; font-size: 20px; }
+  .card .corner { font-size: 11px; }
+  .card .big { font-size: 23px; }
+  .card.sm { width: 42px; height: 60px; font-size: 15px; }
+  .card.sm .corner { font-size: 9px; }
+  .card.sm .big { font-size: 18px; }
+  .btn { font-size: 13px; padding: 10px 2px; }
+  .topbar h1 { font-size: 18px; }
+  .pot-area { font-size: 18px; }
+  .menu-btn { width: 230px; }
+}
+</style>
+</head>
+<body>
+<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+<div id="app">
+
+  <!-- 主菜单 -->
+  <div class="screen show" id="screen-menu">
+    <div class="menu-inner">
+      <div class="logo">🃏 炸金花</div>
+      <div class="menu-sub">支持 3-10 人在线联机 · 积分累积</div>
+      <button class="menu-btn primary" id="menu-local">🤖 人机对战</button>
+      <button class="menu-btn online" id="menu-online">🌐 联机对战</button>
+      <button class="menu-btn score" id="menu-score">🏆 积分榜</button>
+      <div class="menu-stats" id="menu-stats"></div>
+    </div>
+  </div>
+
+  <!-- 人机对战 -->
+  <div class="screen" id="screen-local">
+    <div class="topbar">
+      <div class="topbar-left">
+        <button class="btn small" id="local-back">← 菜单</button>
+        <h1>🃏 炸金花</h1>
+      </div>
+      <div class="room-info">
+        <span>底注 <b id="stake-show">10</b> · 积分 <b id="local-score">0</b></span>
+        <span>第 <b id="round-count">1</b> 局</span>
+      </div>
+    </div>
+    <div class="players">
+      <div class="player-box" id="box-me">
+        <div class="player-head">
+          <div class="avatar me">我</div>
+          <span class="player-name">我 <span class="badge" id="me-vision">未看牌</span></span>
+          <span class="chips-line">💰 <span id="me-chips">1000</span></span>
+        </div>
+        <div class="cards-area" id="me-cards"></div>
+        <div class="status-line" id="me-status"></div>
+      </div>
+      <div class="player-box" id="box-ai">
+        <div class="player-head">
+          <div class="avatar ai">AI</div>
+          <span class="player-name">电脑 <span class="badge" id="ai-vision">未看牌</span></span>
+          <span class="chips-line">💰 <span id="ai-chips">1000</span></span>
+        </div>
+        <div class="cards-area" id="ai-cards"></div>
+        <div class="status-line" id="ai-status"></div>
+      </div>
+    </div>
+    <div class="table-center">
+      <div class="pot-area"><small>底池</small>💰 <span id="pot">0</span></div>
+      <div class="round-info" id="round-info">等待开始…</div>
+      <div class="msg" id="msg">点击下方按钮开始游戏</div>
+      <div class="ai-think" id="ai-think"></div>
+    </div>
+    <div class="actions">
+      <button class="btn look" id="btn-look" disabled>看牌</button>
+      <button class="btn call" id="btn-call" disabled>跟注</button>
+      <button class="btn raise" id="btn-raise" disabled>加注</button>
+      <button class="btn compare" id="btn-compare" disabled>比牌</button>
+      <button class="btn fold" id="btn-fold" disabled>弃牌</button>
+      <button class="btn primary" id="btn-start" style="grid-column: span 2;">开始新一局</button>
+    </div>
+    <div class="stake-bar">
+      <span>底注</span>
+      <input type="range" id="stake-range" min="5" max="50" step="5" value="10">
+      <span class="val" id="stake-label">10</span><span>元</span>
+    </div>
+    <div class="hint">豹子 &gt; 同花顺 &gt; 金花 &gt; 顺子 &gt; 对子 &gt; 单张 ｜ 未看牌跟注半价 ｜ 235 吃豹子</div>
+  </div>
+
+  <!-- 联机对战 -->
+  <div class="screen" id="screen-online">
+    <div class="ol-top">
+      <button class="btn small" id="ol-back">← 菜单</button>
+      <span class="ol-title" id="ol-title">联机对战</span>
+      <span class="ol-status" id="ol-status"></span>
+    </div>
+    <!-- 大厅 -->
+    <div id="ol-lobby">
+      <div class="ol-card">
+        <h3>🎲 创建房间</h3>
+        <p style="font-size:12px;color:#bcd9c5;margin-bottom:6px;">创建房间并邀请好友加入（3-10人）</p>
+        <button class="btn primary" id="ol-create">创建房间</button>
+      </div>
+      <div class="ol-card">
+        <h3>🔑 加入房间</h3>
+        <p style="font-size:12px;color:#bcd9c5;margin-bottom:8px;">输入好友分享的房间码</p>
+        <input id="ol-code-input" placeholder="房间码" maxlength="4" autocomplete="off">
+        <button class="btn" id="ol-join">加入房间</button>
+      </div>
+    </div>
+    <!-- 房间（等待+游戏） -->
+    <div id="ol-room" style="display:none;">
+      <div class="room-code-bar">房间码：<b id="ol-code-show">----</b><span class="role-tag" id="ol-role">房主</span></div>
+      <div class="ol-players" id="ol-players"></div>
+      <div class="table-center" id="ol-table" style="display:none;">
+        <div class="pot-area"><small>底池</small>💰 <span id="ol-pot">0</span></div>
+        <div class="round-info" id="ol-round-info">等待开始…</div>
+        <div class="msg" id="ol-msg"></div>
+      </div>
+      <div class="actions" id="ol-actions">
+        <button class="btn look" id="ol-btn-look" disabled>看牌</button>
+        <button class="btn call" id="ol-btn-call" disabled>跟注</button>
+        <button class="btn raise" id="ol-btn-raise" disabled>加注</button>
+        <button class="btn compare" id="ol-btn-compare" disabled>比牌</button>
+        <button class="btn fold" id="ol-btn-fold" disabled>弃牌</button>
+        <button class="btn primary" id="ol-btn-start" style="grid-column: span 2;" disabled>开始游戏</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<!-- 积分榜弹窗 -->
+<div class="modal-mask" id="score-modal">
+  <div class="modal">
+    <h2>🏆 积分榜</h2>
+    <div class="sub" id="score-mode-tag"></div>
+    <div id="score-body"></div>
+    <div class="btn-row"><button class="btn primary" id="score-close">关闭</button></div>
+  </div>
+</div>
+
+<!-- 结算弹窗（人机） -->
+<div class="modal-mask" id="modal">
+  <div class="modal">
+    <h2 id="modal-title">结果</h2>
+    <div class="sub" id="modal-sub"></div>
+    <div class="result-cards" id="modal-cards"></div>
+    <div class="hand-name" id="modal-hand"></div>
+    <div class="win-amt" id="modal-amt"></div>
+    <div class="score-change" id="modal-score"></div>
+    <div class="btn-row">
+      <button class="btn primary" id="modal-continue">下一局</button>
+      <button class="btn" id="modal-close">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- 结算弹窗（联机） -->
+<div class="modal-mask" id="ol-modal">
+  <div class="modal">
+    <h2 id="ol-modal-title">结果</h2>
+    <div class="sub" id="ol-modal-sub"></div>
+    <div class="result-cards" id="ol-modal-cards"></div>
+    <div class="win-amt" id="ol-modal-amt"></div>
+    <div class="score-change" id="ol-modal-score"></div>
+    <div class="btn-row" id="ol-modal-btns">
+      <button class="btn primary" id="ol-modal-next">下一局</button>
+      <button class="btn" id="ol-modal-close">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- 比牌对手选择 -->
+<div class="modal-mask" id="compare-modal">
+  <div class="modal">
+    <h2>选择比牌对手</h2>
+    <div class="sub">选择你要比牌的玩家</div>
+    <div id="compare-options"></div>
+    <div class="btn-row"><button class="btn" id="compare-cancel">取消</button></div>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* ========== 工具函数 ========== */
+const $ = id => document.getElementById(id);
+const SUITS = [
+  { symbol: "♠", name: "黑桃", color: "black" },
+  { symbol: "♥", name: "红心", color: "red" },
+  { symbol: "♣", name: "梅花", color: "black" },
+  { symbol: "♦", name: "方块", color: "red" }
+];
+const RANK_LABEL = { 1:"A", 2:"2", 3:"3", 4:"4", 5:"5", 6:"6", 7:"7", 8:"8", 9:"9", 10:"10", 11:"J", 12:"Q", 13:"K", 14:"A" };
+
+function makeDeck() {
+  const deck = [];
+  for (const s of SUITS) for (let r = 1; r <= 13; r++) deck.push({ suit: s.symbol, rank: r, color: s.color });
+  return deck;
+}
+function shuffle(arr) { for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; } return arr; }
+
+/* ========== 牌型判定 ========== */
+function evaluateHand(cards) {
+  const ranks = cards.map(c => c.rank).sort((a, b) => a - b);
+  const isFlush = cards.every(c => c.suit === cards[0].suit);
+  let isStraight = false, straightHigh = 0;
+  const u = [...new Set(ranks)];
+  if (u.length === 3) {
+    if (u[2] - u[1] === 1 && u[1] - u[0] === 1) { isStraight = true; straightHigh = u[2]; }
+    else if (u[0] === 1 && u[1] === 2 && u[2] === 13) { isStraight = true; straightHigh = 3; }
+  }
+  if (ranks[0] === ranks[1] && ranks[1] === ranks[2]) return { type: "leopard", name: "豹子", rank: [6, ranks[0]] };
+  if (isFlush && isStraight) return { type: "straightflush", name: "同花顺", rank: [5, straightHigh] };
+  if (isFlush) return { type: "flush", name: "金花", rank: [4, ranks[2], ranks[1], ranks[0]] };
+  if (isStraight) return { type: "straight", name: "顺子", rank: [3, straightHigh] };
+  if (ranks[0] === ranks[1] || ranks[1] === ranks[2]) {
+    const pair = ranks[1], kicker = (ranks[0] === pair) ? ranks[2] : ranks[0];
+    return { type: "pair", name: "对子", rank: [2, pair, kicker] };
+  }
+  return { type: "high", name: "单张", rank: [1, ranks[2], ranks[1], ranks[0]] };
+}
+function is235(cards) {
+  const r = cards.map(c => c.rank).sort((a, b) => a - b);
+  return new Set(cards.map(c => c.suit)).size === 3 && r[0] === 2 && r[1] === 3 && r[2] === 5;
+}
+function compareHands(handA, cardsA, handB, cardsB) {
+  const a235 = is235(cardsA), b235 = is235(cardsB);
+  if (handA.type === "leopard" && b235) return -1;
+  if (handB.type === "leopard" && a235) return 1;
+  const ra = handA.rank, rb = handB.rank;
+  const n = Math.max(ra.length, rb.length);
+  for (let i = 0; i < n; i++) {
+    const va = ra[i] || 0, vb = rb[i] || 0;
+    if (va > vb) return 1;
+    if (va < vb) return -1;
+  }
+  return 0;
+}
+
+/* ========== 积分系统 ========== */
+const LOCAL_KEY = "zzjh_local_board";
+const ONLINE_KEY = "zzjh_online_board";
+function defaultLocalBoard() { return { name: "我", score: 0, games: 0, wins: 0, history: [] }; }
+function loadLocalBoard() { try { return JSON.parse(localStorage.getItem(LOCAL_KEY)) || defaultLocalBoard(); } catch (e) { return defaultLocalBoard(); } }
+function saveLocalBoard(b) { localStorage.setItem(LOCAL_KEY, JSON.stringify(b)); }
+function loadOnlineBoard() { try { return JSON.parse(localStorage.getItem(ONLINE_KEY)) || { players: {}, history: [] }; } catch (e) { return { players: {}, history: [] }; } }
+function saveOnlineBoard(b) { localStorage.setItem(ONLINE_KEY, JSON.stringify(b)); }
+function addLocalGame(win, pts) {
+  const b = loadLocalBoard();
+  b.games++; if (win) b.wins++;
+  b.score += pts;
+  b.history.unshift({ t: new Date().toLocaleString(), win, pts });
+  if (b.history.length > 30) b.history.length = 30;
+  saveLocalBoard(b);
+  return b;
+}
+function addOnlineGame(players, winnerName, pot, stake) {
+  const b = loadOnlineBoard();
+  b.history.unshift({ t: new Date().toLocaleString(), winner: winnerName, players: players.map(p => ({ n: p.name, pts: p.pts })) });
+  if (b.history.length > 30) b.history.length = 30;
+  saveOnlineBoard(b);
+  return b;
+}
+function onlinePlayerScore(name) {
+  const b = loadOnlineBoard();
+  if (!b.players[name]) b.players[name] = { score: 0, games: 0, wins: 0 };
+  return b.players[name];
+}
+function updateOnlineScore(name, win, pts) {
+  const b = loadOnlineBoard();
+  if (!b.players[name]) b.players[name] = { score: 0, games: 0, wins: 0 };
+  b.players[name].score += pts;
+  b.players[name].games++;
+  if (win) b.players[name].wins++;
+  saveOnlineBoard(b);
+  return b;
+}
+
+/* ========== Toast ========== */
+let toastTimer = null;
+function toast(msg, dur) {
+  const t = $("toast");
+  t.textContent = msg;
+  t.style.display = "block";
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.style.display = "none"; }, dur || 2600);
+}
+
+/* ========== 屏幕切换 ========== */
+function showScreen(id) {
+  document.querySelectorAll(".screen").forEach(s => s.classList.remove("show"));
+  $(id).classList.add("show");
+}
+
+/* ========== 渲染工具 ========== */
+function cardHTML(card, faceUp, sm) {
+  const cls = "card" + (sm ? " sm" : "");
+  if (!faceUp) return `<div class="${cls} back"></div>`;
+  const c = card.color === "red" ? " red" : " black";
+  return `<div class="${cls}${c}"><span class="corner">${card.suit}${RANK_LABEL[card.rank]}</span><span class="big">${card.suit}</span></div>`;
+}
+
+/* =====================================================================
+ * 人机对战模式
+ * ===================================================================== */
+const state = {
+  phase: "idle", deck: [],
+  me: { cards: [], hand: null, chips: 1000, folded: false, looked: false },
+  ai: { cards: [], hand: null, chips: 1000, folded: false, looked: false },
+  pot: 0, stake: 10, round: 1, current: "me", callAmount: 10,
+  meInvested: 0, aiInvested: 0, winner: null, lock: false
+};
+
+function renderLocal() {
+  const showMeFace = state.me.looked || state.phase === "showdown" || state.me.folded;
+  const showAiFace = state.phase === "showdown";
+  $("me-cards").innerHTML = state.me.cards.length
+    ? state.me.cards.map(c => cardHTML(c, showMeFace)).join("")
+    : `<span style="color:#6f8f7a;font-size:12px;">等待发牌</span>`;
+  $("ai-cards").innerHTML = state.ai.cards.length
+    ? state.ai.cards.map(c => cardHTML(c, showAiFace)).join("")
+    : `<span style="color:#6f8f7a;font-size:12px;">等待发牌</span>`;
+  $("me-chips").textContent = state.me.chips;
+  $("ai-chips").textContent = state.ai.chips;
+  $("pot").textContent = state.pot;
+  $("round-count").textContent = state.round;
+  $("stake-show").textContent = state.stake;
+  $("me-vision").textContent = state.me.looked ? "已看牌" : "未看牌";
+  $("ai-vision").textContent = state.ai.looked ? "已看牌" : "未看牌";
+  $("box-me").classList.toggle("active", state.current === "me" && state.phase === "betting");
+  $("box-ai").classList.toggle("active", state.current === "ai" && state.phase === "betting");
+  $("box-me").classList.toggle("winner", state.winner === "me");
+  $("box-ai").classList.toggle("winner", state.winner === "ai");
+  $("box-me").classList.toggle("loser", state.me.folded && state.phase !== "showdown");
+  $("box-ai").classList.toggle("loser", state.ai.folded && state.phase !== "showdown");
+  const meSt = [];
+  if (state.me.folded) meSt.push("已弃牌");
+  if (state.meInvested > 0) meSt.push("投入 " + state.meInvested);
+  $("me-status").textContent = meSt.join(" · ");
+  const aiSt = [];
+  if (state.ai.folded) aiSt.push("已弃牌");
+  if (state.aiInvested > 0) aiSt.push("投入 " + state.aiInvested);
+  $("ai-status").textContent = aiSt.join(" · ");
+  const lb = loadLocalBoard();
+  $("local-score").textContent = lb.score;
+  renderLocalActions();
+}
+
+function renderLocalActions() {
+  const betting = state.phase === "betting";
+  const myTurn = betting && state.current === "me" && !state.me.folded;
+  const looked = state.me.looked;
+  $("btn-look").disabled = !(myTurn && !looked);
+  $("btn-call").disabled = !myTurn;
+  $("btn-raise").disabled = !myTurn;
+  $("btn-compare").disabled = !(myTurn && !state.ai.folded);
+  $("btn-fold").disabled = !myTurn;
+  $("btn-start").disabled = betting || state.phase === "showdown";
+  $("btn-look").textContent = "看牌";
+  $("btn-call").textContent = looked ? ("跟注 " + state.callAmount) : ("跟注 " + Math.max(1, Math.ceil(state.callAmount / 2)));
+  $("btn-raise").textContent = "加注";
+  $("btn-compare").textContent = "比牌";
+  $("btn-fold").textContent = "弃牌";
+  $("btn-start").textContent = "开始新一局";
+}
+
+function setMsg(t, small) { $("msg").textContent = t; $("msg").className = "msg" + (small ? " small" : ""); }
+function costFor(player) { return state[player].looked ? state.callAmount : Math.max(1, Math.ceil(state.callAmount / 2)); }
+
+function startLocalRound() {
+  if (state.lock) return;
+  const need = state.stake;
+  if (state.me.chips < need && state.ai.chips < need) { setMsg("双方筹码不足，游戏结束"); state.phase = "gameover"; renderLocal(); return; }
+  state.lock = true;
+  state.phase = "betting";
+  state.deck = shuffle(makeDeck());
+  state.me = { ...state.me, cards: [], hand: null, folded: false, looked: false };
+  state.ai = { ...state.ai, cards: [], hand: null, folded: false, looked: false };
+  state.pot = 0; state.meInvested = 0; state.aiInvested = 0;
+  state.winner = null; state.callAmount = state.stake;
+  state.me.cards = [state.deck.pop(), state.deck.pop(), state.deck.pop()];
+  state.ai.cards = [state.deck.pop(), state.deck.pop(), state.deck.pop()];
+  state.me.hand = evaluateHand(state.me.cards);
+  state.ai.hand = evaluateHand(state.ai.cards);
+  const meFee = Math.min(state.stake, state.me.chips);
+  const aiFee = Math.min(state.stake, state.ai.chips);
+  state.me.chips -= meFee; state.meInvested += meFee;
+  state.ai.chips -= aiFee; state.aiInvested += aiFee;
+  state.pot = meFee + aiFee;
+  state.current = "me";
+  $("round-info").textContent = `第 ${state.round} 局 ｜ 底注 ${state.stake} ｜ 当前注 ${state.callAmount}`;
+  setMsg("发牌完成，轮到你了。先看牌或跟注（未看牌跟注半价）");
+  renderLocal();
+  state.lock = false;
+}
+
+function localDoCall(player) {
+  const cost = costFor(player);
+  const p = state[player];
+  if (p.chips < cost) { setMsg("筹码不足，无法跟注"); return false; }
+  p.chips -= cost; state.pot += cost;
+  if (player === "me") state.meInvested += cost; else state.aiInvested += cost;
+  return true;
+}
+function localDoRaise(player) {
+  const looked = state[player].looked;
+  let newCall = state.callAmount * 2;
+  const p = state[player];
+  const maxByMe = p.chips + (player === "me" ? state.meInvested : state.aiInvested);
+  const maxByOpp = state[player === "me" ? "ai" : "me"].chips + state[player === "me" ? "aiInvested" : "meInvested"];
+  newCall = Math.min(newCall, Math.max(state.callAmount, Math.min(maxByMe, maxByOpp)));
+  const cost = looked ? (newCall - state.callAmount) : Math.max(1, Math.ceil((newCall - state.callAmount) / 2));
+  if (p.chips < cost) { setMsg("筹码不足，无法加注"); return false; }
+  p.chips -= cost; state.pot += cost;
+  if (player === "me") state.meInvested += cost; else state.aiInvested += cost;
+  state.callAmount = newCall;
+  return true;
+}
+function localEndRound(winner) {
+  state.phase = "showdown";
+  state.current = null;
+  const w = state[winner];
+  const other = winner === "me" ? "ai" : "me";
+  w.chips += state.pot;
+  state.winner = winner;
+  renderLocal();
+  // 积分结算
+  const winPts = Math.max(1, Math.round(state.pot / state.stake));
+  const losePts = Math.max(1, Math.round(state[other].chips >= 0 ? (state[other].chips === 0 ? 0 : 0) : 0));
+  const loserInvested = state[other].invested === undefined ? 0 : state[other].invested;
+  const loseAmt = Math.max(1, Math.round((state[other] === state.me ? state.meInvested : state.aiInvested) / state.stake));
+  const lb = addLocalGame(winner === "me", winner === "me" ? winPts : -loseAmt);
+  const myPts = winner === "me" ? winPts : -loseAmt;
+  showLocalModal(winner, myPts, lb);
+}
+function localDoFold(player) {
+  state[player].folded = true;
+  localEndRound(player === "me" ? "ai" : "me");
+}
+function localDoCompare(player) {
+  const p = state[player];
+  const fee = state[player].looked ? state.callAmount : Math.max(1, Math.ceil(state.callAmount / 2));
+  if (p.chips < fee) { setMsg("筹码不足，无法比牌"); return false; }
+  p.chips -= fee; state.pot += fee;
+  if (player === "me") state.meInvested += fee; else state.aiInvested += fee;
+  const result = compareHands(state.me.hand, state.me.cards, state.ai.hand, state.ai.cards);
+  const loser = result >= 0 ? "ai" : "me";
+  state[loser].folded = true;
+  localEndRound(result >= 0 ? "me" : "ai");
+  return true;
+}
+function showLocalModal(winner, myPts, lb) {
+  $("modal-title").textContent = winner === "me" ? "🎉 你赢了！" : "😔 电脑赢了";
+  $("modal-sub").textContent = winner === "me" ? "赢得本局底池" : "再接再厉，下一局翻盘";
+  $("modal-cards").innerHTML =
+    `<div class="result-player"><div class="rp-name">我：${state.me.hand.name}</div><div style="display:flex;gap:6px;justify-content:center;">${state.me.cards.map(c => cardHTML(c, true)).join("")}</div></div>` +
+    `<div class="result-player"><div class="rp-name">电脑：${state.ai.hand.name}</div><div style="display:flex;gap:6px;justify-content:center;">${state.ai.cards.map(c => cardHTML(c, true)).join("")}</div></div>`;
+  $("modal-hand").textContent = "牌型：" + (winner === "me" ? state.me.hand.name : state.ai.hand.name);
+  $("modal-amt").textContent = "+" + state.pot + " 筹码";
+  $("modal-score").innerHTML = myPts >= 0 ? `积分 <span style="color:#7dff9b">+${myPts}</span> · 总分 ${lb.score}` : `积分 <span style="color:#ff8a8a">${myPts}</span> · 总分 ${lb.score}`;
+  state.round++;
+  $("modal").classList.add("show");
+}
+
+function aiTurn() {
+  if (state.phase !== "betting" || state.current !== "ai" || state.ai.folded || state.lock) return;
+  state.lock = true;
+  $("ai-think").textContent = "电脑思考中…";
+  setTimeout(() => { state.lock = false; aiDecide(); renderLocal(); }, 600 + Math.random() * 700);
+}
+function handScore(hand) {
+  const base = { leopard: 0.97, straightflush: 0.9, flush: 0.78, straight: 0.72, pair: 0.5, high: 0.22 };
+  let s = base[hand.type] || 0.2;
+  if (hand.type === "high") s += (hand.rank[1] - 1) / 13 * 0.1;
+  if (hand.type === "pair") s += (hand.rank[1] - 1) / 13 * 0.2;
+  return Math.min(1, s);
+}
+function aiDecide() {
+  const ai = state.ai;
+  const score = handScore(ai.hand);
+  let done = false;
+  if (!ai.looked) {
+    if (Math.random() < 0.45) { ai.looked = true; ai.vision = "已看牌"; $("ai-think").textContent = "电脑看牌了！"; }
+    else { localDoCall("ai"); $("ai-think").textContent = "电脑跟注（未看牌）"; }
+  } else {
+    if (score > 0.85) { localDoRaise("ai"); $("ai-think").textContent = "电脑加注！"; }
+    else if (score > 0.55) { if (Math.random() < 0.6) { localDoRaise("ai"); $("ai-think").textContent = "电脑加注施压"; } else { localDoCall("ai"); $("ai-think").textContent = "电脑跟注"; } }
+    else if (score > 0.28) { if (Math.random() < 0.3) { localDoCompare("ai"); $("ai-think").textContent = "电脑比牌"; done = true; } else { localDoCall("ai"); $("ai-think").textContent = "电脑跟注"; } }
+    else { if (Math.random() < 0.55) { localDoCompare("ai"); $("ai-think").textContent = "电脑比牌试探"; done = true; } else { localDoFold("ai"); done = true; } }
+  }
+  if (state.phase === "betting" && !done) {
+    state.current = "me";
+    $("round-info").textContent = `第 ${state.round} 局 ｜ 底注 ${state.stake} ｜ 当前注 ${state.callAmount}`;
+    setMsg("轮到你了。");
+  }
+}
+
+/* ========== 人机事件 ========== */
+$("btn-start").addEventListener("click", () => { $("modal").classList.remove("show"); startLocalRound(); });
+$("btn-look").addEventListener("click", () => { if (state.phase !== "betting" || state.current !== "me") return; state.me.looked = true; setMsg("你已看牌：" + state.me.hand.name); renderLocal(); aiTurn(); });
+$("btn-call").addEventListener("click", () => { if (state.phase !== "betting" || state.current !== "me") return; const ok = localDoCall("me"); if (!ok) return; setMsg("你跟注了"); renderLocal(); aiTurn(); });
+$("btn-raise").addEventListener("click", () => { if (state.phase !== "betting" || state.current !== "me") return; const ok = localDoRaise("me"); if (!ok) return; setMsg("你加注了！当前注 " + state.callAmount); renderLocal(); aiTurn(); });
+$("btn-compare").addEventListener("click", () => { if (state.phase !== "betting" || state.current !== "me") return; localDoCompare("me"); });
+$("btn-fold").addEventListener("click", () => { if (state.phase !== "betting" || state.current !== "me") return; localDoFold("me"); });
+$("modal-continue").addEventListener("click", () => { $("modal").classList.remove("show"); startLocalRound(); });
+$("modal-close").addEventListener("click", () => $("modal").classList.remove("show"));
+$("stake-range").addEventListener("input", e => { state.stake = parseInt(e.target.value, 10); $("stake-label").textContent = state.stake; $("stake-show").textContent = state.stake; });
+$("local-back").addEventListener("click", () => { $("modal").classList.remove("show"); showScreen("screen-menu"); updateMenuStats(); });
+$("menu-local").addEventListener("click", () => { showScreen("screen-local"); renderLocal(); });
+
+/* =====================================================================
+ * 联机对战模式（PeerJS P2P，host 权威）
+ * ===================================================================== */
+const MAX_PLAYERS = 10;
+const CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+function genCode(len) { let s = ""; for (let i = 0; i < len; i++) s += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]; return s; }
+
+const ol = {
+  peer: null, conns: [], isHost: false, roomCode: "", myName: "玩家", mySeat: -1,
+  players: [], cards: {}, myCards: [],
+  pot: 0, callAmount: 0, current: -1, phase: "lobby", round: 1, stake: 10,
+  lock: false, hostConn: null, heartTimer: null
+};
+
+function olSeat(seat) { return ol.players.find(p => p.seat === seat); }
+function olAlive() { return ol.players.filter(p => !p.folded && !p.out); }
+function olActiveCount() { return olAlive().length; }
+function olCostFor(p) { return p.looked ? ol.callAmount : Math.max(1, Math.ceil(ol.callAmount / 2)); }
+
+function olBroadcast(obj, except) {
+  ol.conns.forEach(c => { if (c.open && c.peer !== except) { try { c.send(obj); } catch (e) {} } });
+}
+function olSendToHost(obj) { if (ol.hostConn && ol.hostConn.open) { try { ol.hostConn.send(obj); } catch (e) {} } }
+function olPublicState() {
+  return {
+    type: "state",
+    players: ol.players.map(p => ({ seat: p.seat, name: p.name, chips: p.chips, folded: p.folded, out: p.out, online: p.online, looked: p.looked, invested: p.invested })),
+    pot: ol.pot, callAmount: ol.callAmount, current: ol.current, phase: ol.phase,
+    round: ol.round, stake: ol.stake, winner: ol.winner, lastAction: ol.lastAction
+  };
+}
+
+/* ---- 创建房间 ---- */
+function createRoom() {
+  cleanupOnline();
+  if (typeof Peer === "undefined") { toast("联机库加载失败（需联网），已切换人机模式"); showScreen("screen-local"); renderLocal(); return; }
+  $("ol-status").textContent = "正在连接服务器…";
+  $("ol-room").style.display = "none";
+  $("ol-lobby").style.display = "block";
+  let code = genCode(4);
+  const peer = new Peer("zzhj-" + code);
+  peer.on("open", id => {
+    ol.isHost = true;
+    ol.roomCode = code;
+    ol.peer = peer;
+    ol.players = [{ seat: 0, name: "玩家1", chips: 1000, folded: false, out: false, online: true, looked: false, invested: 0 }];
+    ol.mySeat = 0;
+    $("ol-lobby").style.display = "none";
+    $("ol-room").style.display = "block";
+    $("ol-code-show").textContent = code;
+    $("ol-role").textContent = "房主";
+    $("ol-status").textContent = "等待玩家加入…";
+    toast("房间已创建，房间码：" + code);
+    renderOnlineRoom();
+  });
+  peer.on("connection", conn => {
+    conn.on("data", data => handleHostMessage(conn, data));
+    conn.on("close", () => handleHostLeave(conn));
+    conn.on("error", () => handleHostLeave(conn));
+  });
+  peer.on("error", err => {
+    if (err.type === "unavailable-id") {
+      // 房间码冲突，换一个重试
+      code = genCode(4);
+      peer.destroy();
+      toast("房间码冲突，正在重试…");
+      setTimeout(() => { if (!$("screen-online").classList.contains("show")) return; const p2 = new Peer("zzhj-" + code); p2.on("open", id => { /* 复用流程 */ }); }, 300);
+      // 简化处理：直接提示
+      cleanupOnline();
+      toast("创建房间失败，请重试或检查网络");
+      $("ol-status").textContent = "连接失败";
+    } else if (err.type === "network" || err.type === "server-error" || err.type === "socket-error" || err.type === "socket-closed") {
+      cleanupOnline();
+      toast("无法连接联机服务器，已切换人机模式");
+      showScreen("screen-local");
+      renderLocal();
+    }
+  });
+}
+
+/* ---- 加入房间 ---- */
+function joinRoom() {
+  cleanupOnline();
+  if (typeof Peer === "undefined") { toast("联机库加载失败（需联网），已切换人机模式"); showScreen("screen-local"); renderLocal(); return; }
+  const code = $("ol-code-input").value.trim().toUpperCase();
+  if (!/^[A-Z0-9]{4}$/.test(code)) { toast("请输入4位房间码"); return; }
+  $("ol-status").textContent = "正在连接房间 " + code + "…";
+  const peer = new Peer(); // 随机ID
+  peer.on("open", id => {
+    ol.peer = peer;
+    ol.roomCode = code;
+    const conn = peer.connect("zzhj-" + code, { reliable: true });
+    ol.hostConn = conn;
+    conn.on("open", () => {
+      conn.send({ type: "join", name: ol.myName });
+    });
+    conn.on("data", data => handleGuestMessage(data));
+    conn.on("close", () => { toast("与房主连接断开，已返回菜单"); cleanupOnline(); showScreen("screen-menu"); updateMenuStats(); });
+    conn.on("error", () => { toast("与房主连接失败"); });
+  });
+  peer.on("error", err => {
+    if (err.type === "network" || err.type === "server-error" || err.type === "socket-error" || err.type === "socket-closed" || err.type === "peer-unavailable") {
+      cleanupOnline();
+      toast("无法连接联机服务器，已切换人机模式");
+      showScreen("screen-local");
+      renderLocal();
+    }
+  });
+}
+
+/* ---- host 消息处理 ---- */
+function handleHostMessage(conn, data) {
+  if (!data || typeof data !== "object") return;
+  if (data.type === "join") {
+    if (ol.phase !== "lobby") { conn.send({ type: "room_busy" }); try { conn.close(); } catch (e) {} return; }
+    const seat = ol.players.length;
+    if (seat >= MAX_PLAYERS) { conn.send({ type: "full" }); try { conn.close(); } catch (e) {} return; }
+    const p = { seat, name: data.name || ("玩家" + (seat + 1)), chips: 1000, folded: false, out: false, online: true, looked: false, invested: 0 };
+    ol.players.push(p);
+    ol.conns.push(conn);
+    conn.send({ type: "welcome", mySeat: seat, code: ol.roomCode, players: ol.players.map(x => ({ seat: x.seat, name: x.name, online: true })), state: olPublicState() });
+    olBroadcast({ type: "joined", player: { seat, name: p.name }, players: ol.players.map(x => ({ seat: x.seat, name: x.name, online: x.online })) });
+    toast(p.name + " 加入了房间 (" + ol.players.length + "/" + MAX_PLAYERS + ")");
+    renderOnlineRoom();
+  } else if (data.type === "action") {
+    handleHostAction(conn, data);
+  } else if (data.type === "pong") {
+    // 保活
+  }
+}
+
+function handleHostLeave(conn) {
+  const idx = ol.conns.indexOf(conn);
+  if (idx >= 0) {
+    const p = ol.players[idx + 1]; // conns[0] 对应 seat 1
+    ol.conns.splice(idx, 1);
+    if (p) {
+      p.online = false; p.out = true;
+      toast(p.name + " 掉线了");
+      olBroadcast({ type: "left", seat: p.seat, name: p.name, players: ol.players.map(x => ({ seat: x.seat, name: x.name, online: x.online })) });
+      checkAutoEnd();
+      renderOnlineRoom();
+    }
+  }
+}
+
+/* ---- host 动作处理（回合制权威） ---- */
+function handleHostAction(conn, data) {
+  const seat = ol.players.findIndex(p => p.conn === conn) + 1;
+  if (ol.phase !== "betting" || data.seat === undefined) return;
+  const p = ol.players[data.seat];
+  if (!p || p.folded || p.out || !p.online) return;
+  if (ol.current !== data.seat) { conn.send({ type: "not_turn" }); return; }
+  const act = data.action;
+  if (act === "look") {
+    p.looked = true;
+    ol.lastAction = p.name + " 看牌了";
+    advanceTurn();
+  } else if (act === "call") {
+    const cost = olCostFor(p);
+    if (p.chips < cost) { conn.send({ type: "err", msg: "筹码不足" }); return; }
+    p.chips -= cost; p.invested += cost; ol.pot += cost;
+    ol.lastAction = p.name + " 跟注 " + cost;
+    advanceTurn();
+  } else if (act === "raise") {
+    let newCall = ol.callAmount * 2;
+    const maxByMe = p.chips + p.invested;
+    const oppMax = Math.max.apply(null, olAlive().filter(x => x.seat !== p.seat).map(x => x.chips + x.invested));
+    newCall = Math.min(newCall, Math.max(ol.callAmount, Math.min(maxByMe, oppMax)));
+    const cost = p.looked ? (newCall - ol.callAmount) : Math.max(1, Math.ceil((newCall - ol.callAmount) / 2));
+    if (p.chips < cost) { conn.send({ type: "err", msg: "筹码不足" }); return; }
+    p.chips -= cost; p.invested += cost; ol.pot += cost;
+    ol.callAmount = newCall;
+    ol.lastAction = p.name + " 加注至 " + newCall;
+    advanceTurn();
+  } else if (act === "compare") {
+    const target = data.target;
+    const tp = ol.players[target];
+    if (!tp || tp.folded || tp.out || !tp.online || target === p.seat) return;
+    const fee = olCostFor(p);
+    if (p.chips < fee) { conn.send({ type: "err", msg: "筹码不足" }); return; }
+    p.chips -= fee; p.invested += fee; ol.pot += fee;
+    const ph = evaluateHand(ol.cards[p.seat]);
+    const th = evaluateHand(ol.cards[target]);
+    const res = compareHands(ph, ol.cards[p.seat], th, ol.cards[target]);
+    const loserSeat = res >= 0 ? target : p.seat;
+    const loser = ol.players[loserSeat];
+    loser.folded = true;
+    ol.lastAction = p.name + " 与 " + tp.name + " 比牌，" + (res >= 0 ? tp.name : p.name) + " 落败";
+    olBroadcast({ type: "compare_result", a: p.seat, b: target, loser: loserSeat, winner: res >= 0 ? p.seat : target, handA: { cards: ol.cards[p.seat], name: ph.name }, handB: { cards: ol.cards[target], name: th.name } });
+    checkAutoEnd();
+    if (ol.phase === "betting") advanceTurn();
+  } else if (act === "fold") {
+    p.folded = true;
+    ol.lastAction = p.name + " 弃牌";
+    olBroadcast({ type: "folded", seat: p.seat, name: p.name });
+    checkAutoEnd();
+    if (ol.phase === "betting") advanceTurn();
+  }
+  olBroadcast(olPublicState());
+  renderOnlineRoom();
+}
+
+function advanceTurn() {
+  const alive = olAlive();
+  if (alive.length <= 1) return;
+  let next = ol.current;
+  for (let i = 0; i < ol.players.length; i++) {
+    next = (next + 1) % ol.players.length;
+    const p = ol.players[next];
+    if (!p.folded && !p.out && p.online) break;
+  }
+  ol.current = next;
+  olBroadcast(olPublicState());
+  renderOnlineRoom();
+}
+
+function checkAutoEnd() {
+  const alive = olAlive();
+  if (ol.phase === "betting" && alive.length <= 1) {
+    const winner = alive[0];
+    showdown(winner ? winner.seat : -1, winner ? winner.name : "无");
+  }
+}
+
+/* ---- host 发牌 ---- */
+function hostStartGame() {
+  if (ol.phase !== "lobby" || !ol.isHost) return;
+  const alivePlayers = ol.players.filter(p => p.online);
+  if (alivePlayers.length < 3) { toast("至少需要3名玩家才能开局"); return; }
+  ol.phase = "betting";
+  ol.round = 1;
+  ol.stake = 10;
+  ol.winner = null;
+  ol.lastAction = "新一局开始";
+  // 重置
+  ol.players.forEach(p => { p.chips = 1000; p.folded = false; p.out = false; p.looked = false; p.invested = 0; });
+  ol.cards = {};
+  ol.pot = 0; ol.callAmount = 10; ol.current = 0;
+  deal();
+}
+
+function deal() {
+  const deck = shuffle(makeDeck());
+  ol.players.forEach(p => {
+    const cards = [deck.pop(), deck.pop(), deck.pop()];
+    ol.cards[p.seat] = cards;
+    const conn = ol.conns[p.seat - 1];
+    if (conn && conn.open) {
+      conn.send({ type: "deal", seat: p.seat, cards: cards });
+    }
+  });
+  // 底注
+  ol.players.forEach(p => {
+    const fee = Math.min(ol.stake, p.chips);
+    p.chips -= fee; p.invested += fee; ol.pot += fee;
+  });
+  olBroadcast({ type: "game_start", pot: ol.pot, callAmount: ol.callAmount, stake: ol.stake, round: ol.round });
+  olBroadcast(olPublicState());
+  renderOnlineRoom();
+}
+
+/* ---- host 结算 ---- */
+function showdown(winnerSeat, winnerName) {
+  ol.phase = "showdown";
+  ol.current = -1;
+  ol.winner = winnerSeat;
+  // 积分
+  const winPts = Math.max(1, Math.round(ol.pot / ol.stake));
+  const results = ol.players.map(p => {
+    const pts = p.seat === winnerSeat ? winPts : -Math.max(1, Math.round(p.invested / ol.stake));
+    if (p.seat === winnerSeat) updateOnlineScore(p.name, true, pts);
+    else updateOnlineScore(p.name, false, pts);
+    return { seat: p.seat, name: p.name, cards: ol.cards[p.seat], hand: evaluateHand(ol.cards[p.seat]), pts, winner: p.seat === winnerSeat };
+  });
+  const board = loadOnlineBoard();
+  addOnlineGame(results, winnerName, ol.pot, ol.stake);
+  olBroadcast({ type: "showdown", results, pot: ol.pot, winnerSeat, winnerName, board: loadOnlineBoard() });
+  renderOnlineRoom();
+}
+
+function hostNextRound() {
+  ol.phase = "betting";
+  ol.round++;
+  ol.players.forEach(p => { p.chips = 1000; p.folded = false; p.out = false; p.looked = false; p.invested = 0; });
+  ol.cards = {};
+  ol.pot = 0; ol.callAmount = 10; ol.current = 0;
+  ol.winner = null;
+  ol.lastAction = "第 " + ol.round + " 局开始";
+  olBroadcast({ type: "new_round", round: ol.round });
+  deal();
+}
+
+/* ---- guest 消息处理 ---- */
+function handleGuestMessage(data) {
+  if (!data || typeof data !== "object") return;
+  if (data.type === "welcome") {
+    ol.isHost = false;
+    ol.mySeat = data.mySeat;
+    ol.roomCode = data.code;
+    $("ol-lobby").style.display = "none";
+    $("ol-room").style.display = "block";
+    $("ol-code-show").textContent = data.code;
+    $("ol-role").textContent = "玩家";
+    $("ol-status").textContent = "已加入房间";
+    ol.players = data.players.map(p => ({ seat: p.seat, name: p.name, chips: 1000, folded: false, out: false, online: p.online, looked: false, invested: 0 }));
+    applyPublicState(data.state);
+    toast("成功加入房间！");
+    renderOnlineRoom();
+  } else if (data.type === "full") { toast("房间已满员"); cleanupOnline(); showScreen("screen-menu"); updateMenuStats(); }
+  else if (data.type === "room_busy") { toast("游戏已开始，无法加入"); cleanupOnline(); showScreen("screen-menu"); updateMenuStats(); }
+  else if (data.type === "joined") {
+    const exists = ol.players.find(p => p.seat === data.player.seat);
+    if (!exists) ol.players.push({ seat: data.player.seat, name: data.player.name, chips: 1000, folded: false, out: false, online: true, looked: false, invested: 0 });
+    ol.players = ol.players.map(p => { const np = data.players.find(x => x.seat === p.seat); if (np) p.online = np.online; return p; });
+    renderOnlineRoom();
+  } else if (data.type === "left") {
+    const p = ol.players.find(x => x.seat === data.seat);
+    if (p) { p.online = false; p.out = true; }
+    toast(data.name + " 掉线了");
+    renderOnlineRoom();
+  } else if (data.type === "deal") {
+    ol.myCards = data.cards;
+  } else if (data.type === "game_start") {
+    ol.pot = data.pot; ol.callAmount = data.callAmount; ol.stake = data.stake; ol.round = data.round;
+  } else if (data.type === "state") {
+    applyPublicState(data);
+    renderOnlineRoom();
+  } else if (data.type === "compare_result") {
+    if (ol.mySeat === data.a || ol.mySeat === data.b) {
+      $("ol-msg").textContent = data.handA && ol.mySeat === data.a ? (data.handA.name + " vs " + data.handB.name) : "比牌中…";
+    }
+  } else if (data.type === "folded") {
+    const p = ol.players.find(x => x.seat === data.seat);
+    if (p) { p.folded = true; }
+  } else if (data.type === "showdown") {
+    ol.phase = "showdown";
+    ol.winner = data.winnerSeat;
+    showOnlineModal(data);
+  } else if (data.type === "new_round") {
+    ol.round = data.round;
+  } else if (data.type === "err") { toast(data.msg); }
+}
+
+function applyPublicState(st) {
+  if (!st) return;
+  st.players.forEach(sp => {
+    const p = ol.players.find(x => x.seat === sp.seat);
+    if (p) {
+      p.chips = sp.chips; p.folded = sp.folded; p.out = sp.out; p.online = sp.online;
+      p.looked = sp.looked; p.invested = sp.invested;
+    }
+  });
+  ol.pot = st.pot; ol.callAmount = st.callAmount; ol.current = st.current; ol.phase = st.phase;
+  ol.round = st.round; ol.stake = st.stake; ol.winner = st.winner; ol.lastAction = st.lastAction;
+}
+
+/* ---- 联机 UI 渲染 ---- */
+function renderOnlineRoom() {
+  const host = ol.isHost;
+  $("ol-role").textContent = host ? "房主" : "玩家";
+  // 玩家席位
+  const wrap = $("ol-players");
+  const seats = [];
+  for (let i = 0; i < MAX_PLAYERS; i++) {
+    const p = ol.players.find(x => x.seat === i);
+    if (!p) {
+      seats.push(`<div class="ol-empty" style="flex:1 1 22%;min-width:168px;">空位</div>`);
+      continue;
+    }
+    const isMe = i === ol.mySeat;
+    const alive = !p.folded && !p.out && p.online;
+    const showCards = isMe && ol.phase === "betting" ? ol.myCards : [];
+    const faceUp = isMe && ol.phase !== "lobby" && ol.phase !== "betting";
+    let cardHtml = "";
+    if (isMe && ol.phase !== "lobby") {
+      const looked = p.looked;
+      const showFace = looked || ol.phase === "showdown";
+      cardHtml = ol.myCards.length ? ol.myCards.map(c => cardHTML(c, showFace, true)).join("") : "";
+    } else if (ol.phase === "showdown" && p.out && false) {
+      cardHtml = "";
+    }
+    const statusTxt = !p.online ? "掉线" : (p.folded ? "已弃牌" : (ol.phase === "lobby" ? "等待中" : (p.looked ? "已看牌" : "未看牌")));
+    const cls = ["ol-seat"];
+    if (ol.phase === "betting" && ol.current === i && alive) cls.push("active");
+    if (ol.winner === i) cls.push("winner");
+    if (!p.online) cls.push("offline");
+    seats.push(`<div class="${cls.join(" ")}">
+      <div class="seat-head">
+        <div class="avatar" style="background:${isMe ? "#3a7bd5" : (i % 2 ? "#7b5ea7" : "#c0392b")};">${isMe ? "我" : "P" + (i + 1)}</div>
+        <span class="seat-name">${p.name}${isMe ? "（你）" : ""}</span>
+        <span class="seat-chips">💰 ${p.chips}</span>
+      </div>
+      <div class="cards-area" style="justify-content:center;">${cardHtml || `<span style="color:#5d7d68;font-size:11px;">${ol.phase === "lobby" ? "—" : (isMe ? "等待发牌" : "牌背")}</span>`}</div>
+      <div class="seat-status">${statusTxt}${p.invested > 0 ? " · 投入" + p.invested : ""}</div>
+    </div>`);
+  }
+  wrap.innerHTML = seats.join("");
+
+  // 桌面
+  const tableVisible = ol.phase !== "lobby";
+  $("ol-table").style.display = tableVisible ? "block" : "none";
+  $("ol-pot").textContent = ol.pot;
+  $("ol-round-info").textContent = tableVisible ? `第 ${ol.round} 局 ｜ 底注 ${ol.stake} ｜ 当前注 ${ol.callAmount}${ol.lastAction ? " ｜ " + ol.lastAction : ""}` : "";
+  const me = olSeat(ol.mySeat);
+  const myTurn = ol.phase === "betting" && ol.current === ol.mySeat && me && !me.folded && !me.out;
+  if (ol.phase === "lobby") {
+    $("ol-msg").textContent = host ? "点击开始游戏（至少3人）" : "等待房主开始游戏…";
+  } else if (ol.phase === "betting") {
+    if (me && me.folded) $("ol-msg").textContent = "你已弃牌，等待本局结束";
+    else if (myTurn) $("ol-msg").textContent = "轮到你了！";
+    else {
+      const cp = ol.players.find(p => p.seat === ol.current && p.online && !p.folded && !p.out);
+      $("ol-msg").textContent = cp ? "等待 " + cp.name + " 行动…" : "轮到你了！";
+    }
+  } else if (ol.phase === "showdown") {
+    $("ol-msg").textContent = "本局结束";
+  }
+
+  // 按钮
+  const showActions = host && ol.phase === "lobby";
+  $("ol-btn-start").style.display = showActions ? "" : "none";
+  $("ol-btn-start").disabled = !(host && ol.phase === "lobby" && ol.players.filter(p => p.online).length >= 3);
+  $("ol-btn-start").textContent = "开始游戏";
+  const act = showActions ? "none" : "";
+  ["ol-btn-look", "ol-btn-call", "ol-btn-raise", "ol-btn-compare", "ol-btn-fold"].forEach(id => $(id).style.display = act);
+  const myLooked = me ? me.looked : false;
+  $("ol-btn-look").disabled = !(myTurn && !myLooked);
+  $("ol-btn-call").disabled = !myTurn;
+  $("ol-btn-raise").disabled = !myTurn;
+  $("ol-btn-compare").disabled = !(myTurn && olAlive().filter(p => p.seat !== ol.mySeat).length > 0);
+  $("ol-btn-fold").disabled = !myTurn;
+  $("ol-btn-call").textContent = myLooked ? ("跟注 " + ol.callAmount) : ("跟注 " + Math.max(1, Math.ceil(ol.callAmount / 2)));
+  $("ol-btn-raise").textContent = "加注";
+  $("ol-btn-compare").textContent = "比牌";
+  $("ol-btn-fold").textContent = "弃牌";
+  $("ol-btn-look").textContent = "看牌";
+  if (ol.phase === "showdown") { ["ol-btn-look","ol-btn-call","ol-btn-raise","ol-btn-compare","ol-btn-fold"].forEach(id => $(id).style.display = "none"); }
+}
+
+function olSendAction(action, target) {
+  if (ol.phase !== "betting") return;
+  olSendToHost({ type: "action", action, seat: ol.mySeat, target });
+}
+
+function showOnlineModal(data) {
+  $("ol-modal-title").textContent = "🎉 本局结束";
+  $("ol-modal-sub").textContent = "获胜者：" + data.winnerName;
+  $("ol-modal-cards").innerHTML = data.results.map(r =>
+    `<div class="result-player"><div class="rp-name">${r.name}${r.winner ? " 🏆" : ""}：${r.hand.name}</div><div style="display:flex;gap:6px;justify-content:center;">${r.cards.map(c => cardHTML(c, true, true)).join("")}</div><div class="score-change" style="font-size:13px;">${r.pts >= 0 ? `<span style="color:#7dff9b">+${r.pts} 分</span>` : `<span style="color:#ff8a8a">${r.pts} 分</span>`}</div></div>`
+  ).join("");
+  $("ol-modal-amt").textContent = "底池 " + data.pot + " 筹码";
+  const meR = data.results.find(r => r.seat === ol.mySeat);
+  if (meR) $("ol-modal-score").innerHTML = meR.pts >= 0 ? `本局积分 <span style="color:#7dff9b">+${meR.pts}</span>` : `本局积分 <span style="color:#ff8a8a">${meR.pts}</span>`;
+  // 显示按钮
+  const nextBtn = $("ol-modal-next");
+  nextBtn.style.display = ol.isHost ? "" : "none";
+  if (!ol.isHost) $("ol-modal-sub").textContent = "获胜者：" + data.winnerName + "（等待房主开始下一局）";
+  $("ol-modal").classList.add("show");
+}
+
+function cleanupOnline() {
+  if (ol.peer) { try { ol.peer.destroy(); } catch (e) {} }
+  ol.peer = null; ol.conns = []; ol.hostConn = null; ol.isHost = false; ol.roomCode = "";
+  ol.players = []; ol.cards = {}; ol.myCards = []; ol.mySeat = -1;
+  ol.pot = 0; ol.callAmount = 0; ol.current = -1; ol.phase = "lobby"; ol.round = 1;
+  ol.winner = null; ol.lock = false;
+  $("ol-modal").classList.remove("show");
+  $("compare-modal").classList.remove("show");
+}
+
+/* ---- 联机事件 ---- */
+$("menu-online").addEventListener("click", () => { showScreen("screen-online"); $("ol-lobby").style.display = "block"; $("ol-room").style.display = "none"; $("ol-status").textContent = ""; });
+$("ol-create").addEventListener("click", createRoom);
+$("ol-join").addEventListener("click", joinRoom);
+$("ol-back").addEventListener("click", () => { cleanupOnline(); showScreen("screen-menu"); updateMenuStats(); });
+$("ol-btn-start").addEventListener("click", hostStartGame);
+$("ol-btn-look").addEventListener("click", () => { olSendAction("look"); const me = olSeat(ol.mySeat); if (me) { me.looked = true; } renderOnlineRoom(); });
+$("ol-btn-call").addEventListener("click", () => olSendAction("call"));
+$("ol-btn-raise").addEventListener("click", () => olSendAction("raise"));
+$("ol-btn-fold").addEventListener("click", () => olSendAction("fold"));
+$("ol-btn-compare").addEventListener("click", () => {
+  const targets = olAlive().filter(p => p.seat !== ol.mySeat);
+  if (targets.length === 0) return;
+  if (targets.length === 1) { olSendAction("compare", targets[0].seat); return; }
+  $("compare-options").innerHTML = targets.map(t =>
+    `<button class="btn" style="width:80%;margin:6px auto;display:block;" onclick="olSendAction('compare',${t.seat});$('compare-modal').classList.remove('show');">${t.name}</button>`
+  ).join("");
+  $("compare-modal").classList.add("show");
+});
+$("compare-cancel").addEventListener("click", () => $("compare-modal").classList.remove("show"));
+$("ol-modal-close").addEventListener("click", () => $("ol-modal").classList.remove("show"));
+$("ol-modal-next").addEventListener("click", () => { $("ol-modal").classList.remove("show"); hostNextRound(); });
+
+/* =====================================================================
+ * 积分榜
+ * ===================================================================== */
+function updateMenuStats() {
+  const lb = loadLocalBoard();
+  const ob = loadOnlineBoard();
+  const pCount = Object.keys(ob.players).length;
+  $("menu-stats").innerHTML =
+    `人机：积分 ${lb.score} ｜ ${lb.games} 局 · ${lb.wins} 胜<br>` +
+    `联机：${pCount} 位玩家 · ${ob.history.length} 局记录`;
+}
+
+function openScoreModal(mode) {
+  $("score-body").innerHTML = "";
+  if (mode === "local") {
+    const b = loadLocalBoard();
+    $("score-mode-tag").textContent = "人机对战战绩";
+    $("score-body").innerHTML = `
+      <div style="font-size:20px;color:#ffe9a8;margin:6px 0;">总分 <b style="color:#ffd76a;font-size:28px;">${b.score}</b></div>
+      <table class="score-table"><tr><th>总局数</th><th>胜局</th><th>胜率</th></tr>
+      <tr><td>${b.games}</td><td>${b.wins}</td><td>${b.games ? Math.round(b.wins / b.games * 100) : 0}%</td></tr></table>
+      <div style="font-size:13px;color:#bcd9c5;margin:8px 0 4px;">最近战绩</div>
+      <div class="history-list">${b.history.length ? b.history.map(h => `<div>${h.t} · ${h.win ? '<span class="pos">胜</span>' : '<span class="neg">负</span>'} · <span class="${h.pts >= 0 ? "pos" : "neg"}">${h.pts >= 0 ? "+" : ""}${h.pts}</span></div>`).join("") : "<div>暂无记录</div>"}</div>`;
+  } else {
+    const b = loadOnlineBoard();
+    $("score-mode-tag").textContent = "联机对战积分账本（跨局累积）";
+    const rows = Object.entries(b.players).map(([name, v]) => ({ name, ...v })).sort((a, b) => b.score - a.score);
+    $("score-body").innerHTML = `
+      <table class="score-table"><tr><th>排名</th><th>玩家</th><th>积分</th><th>局数</th><th>胜局</th></tr>
+      ${rows.length ? rows.map((r, i) => `<tr><td class="${i === 0 ? "rank1" : ""}">${i + 1}</td><td>${r.name}</td><td class="${r.score >= 0 ? "pos" : "neg"}">${r.score}</td><td>${r.games}</td><td>${r.wins}</td></tr>`).join("") : "<tr><td colspan='5' style='color:#8fae99;'>暂无联机记录</td></tr>"}
+      </table>
+      <div style="font-size:13px;color:#bcd9c5;margin:8px 0 4px;">最近战绩</div>
+      <div class="history-list">${b.history.length ? b.history.map(h => `<div>${h.t} · 胜者：${h.winner} · ${h.players.map(p => `${p.n} ${p.pts >= 0 ? "+" : ""}${p.pts}`).join("，")}</div>`).join("") : "<div>暂无记录</div>"}</div>`;
+  }
+  $("score-modal").classList.add("show");
+}
+let scoreMode = "local";
+$("menu-score").addEventListener("click", () => { scoreMode = "local"; openScoreModal(scoreMode); });
+$("score-close").addEventListener("click", () => $("score-modal").classList.remove("show"));
+
+/* ========== 初始化 ========== */
+renderLocal();
+updateMenuStats();
+</script>
+</body>
+</html>
