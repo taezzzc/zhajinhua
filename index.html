@@ -1071,11 +1071,12 @@ function handleHostLeave(conn) {
 
 /* ---- host 动作处理（回合制权威） ---- */
 function handleHostAction(conn, data) {
+  const sendErr = (msg) => { if (conn) { conn.send({ type: "err", msg }); } else { toast(msg); } };
   const seat = ol.players.findIndex(p => p.conn === conn) + 1;
   if (ol.phase !== "betting" || data.seat === undefined) return;
   const p = ol.players[data.seat];
   if (!p || p.folded || p.out || !p.online) return;
-  if (ol.current !== data.seat) { conn.send({ type: "not_turn" }); return; }
+  if (ol.current !== data.seat) { sendErr("还没轮到你行动"); return; }
   const act = data.action;
   if (act === "look") {
     p.looked = true;
@@ -1086,7 +1087,7 @@ function handleHostAction(conn, data) {
     return;
   } else if (act === "call") {
     const min = olCostFor(p);
-    if (p.chips < min) { conn.send({ type: "err", msg: "筹码不足" }); return; }
+    if (p.chips < min) { sendErr("筹码不足"); return; }
     let amt = parseInt(data.amount, 10);
     if (isNaN(amt) || amt < min) amt = min;
     amt = Math.min(amt, p.chips);
@@ -1098,19 +1099,19 @@ function handleHostAction(conn, data) {
   } else if (act === "raise") {
     const target = Math.max(olMinRaiseCall(), parseInt(data.newCall, 10) || ol.callAmount * 2);
     const cost = target - ol.callAmount;
-    if (p.chips < cost) { conn.send({ type: "err", msg: "筹码不足" }); return; }
+    if (p.chips < cost) { sendErr("筹码不足"); return; }
     p.chips -= cost; p.invested += cost; ol.pot += cost;
     ol.callAmount = target;
     ol.lastAction = p.name + " 加注至 " + target;
     olRecordBet(data.seat, target);
     advanceTurn();
   } else if (act === "compare") {
-    if (!ol.firstRoundOver) { conn.send({ type: "err", msg: "第一轮不能比牌，请先跟注/加注/弃牌" }); return; }
+    if (!ol.firstRoundOver) { sendErr("第一轮不能比牌，请先跟注/加注/弃牌"); return; }
     const target = data.target;
     const tp = ol.players[target];
     if (!tp || tp.folded || tp.out || !tp.online || target === p.seat) return;
     const fee = olCostFor(p);
-    if (p.chips < fee) { conn.send({ type: "err", msg: "筹码不足" }); return; }
+    if (p.chips < fee) { sendErr("筹码不足"); return; }
     p.chips -= fee; p.invested += fee; ol.pot += fee;
     olRecordBet(p.seat, fee);
     const ph = evaluateHand(ol.cards[p.seat]);
@@ -1420,7 +1421,13 @@ function renderOnlineRoom() {
 
 function olSendAction(action, target, amount, newCall) {
   if (ol.phase !== "betting") return;
-  olSendToHost({ type: "action", action, seat: ol.mySeat, target, amount, newCall });
+  const obj = { type: "action", action, seat: ol.mySeat, target, amount, newCall };
+  if (ol.isHost) {
+    // 房主是权威节点且无 hostConn，行动必须本地处理，否则点击跟注/暗牌会静默丢失
+    handleHostAction(null, obj);
+  } else {
+    olSendToHost(obj);
+  }
 }
 
 function showOnlineModal(data) {
