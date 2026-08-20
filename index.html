@@ -518,7 +518,8 @@ const state = {
   ais: AI_NAMES.map((n, i) => ({ id: "ai" + i, name: n, cards: [], hand: null, chips: 500, folded: false, looked: false, invested: 0 })),
   pot: 0, stake: 1, round: 1, current: "me", callAmount: 1,
   winner: null, lock: false,
-  lastActorDark: false, lastActorBet: 1
+  lastActorDark: false, lastActorBet: 1,
+  firstRoundOver: false, roundStarter: "me", actedSet: {}
 };
 function localSeats() { return ["me", "ai0", "ai1", "ai2", "ai3"]; }
 function localPlayer(id) { return id === "me" ? state.me : state.ais[parseInt(id.slice(2), 10)]; }
@@ -572,14 +573,14 @@ function renderLocalActions() {
   $("btn-look").disabled = !(myTurn && !looked);
   $("btn-call").disabled = !myTurn;
   $("btn-raise").disabled = !myTurn;
-  $("btn-compare").disabled = !(myTurn && localAlive().length > 1);
+  $("btn-compare").disabled = !(myTurn && localAlive().length > 1 && state.firstRoundOver);
   $("btn-fold").disabled = !myTurn;
   $("btn-start").disabled = betting || state.phase === "showdown";
   $("btn-look").textContent = "看牌";
   const myCost = costFor("me");
   $("btn-call").textContent = looked ? ("看牌跟注 " + myCost) : ("暗牌跟注 " + myCost);
   $("btn-raise").textContent = "加注 至 " + minRaiseCall();
-  $("btn-compare").textContent = "比牌 " + myCost;
+  $("btn-compare").textContent = state.firstRoundOver ? ("比牌 " + myCost) : "第一轮不能比牌";
   $("btn-fold").textContent = "弃牌";
   $("btn-start").textContent = "开始新一局";
   // 押注金额自选栏：轮到玩家时显示，默认填最低跟注额
@@ -613,9 +614,10 @@ function startLocalRound() {
   state.lock = true;
   state.phase = "betting";
   state.deck = shuffle(makeDeck());
-  // 重开新局：所有玩家筹码恢复 500
-  localSeats().forEach(id => { const p = localPlayer(id); p.chips = 500; p.cards = []; p.hand = null; p.folded = false; p.looked = false; p.invested = 0; });
+  // 重开新局：筹码跨局累积（不重置），仅清空手牌与局内状态
+  localSeats().forEach(id => { const p = localPlayer(id); p.cards = []; p.hand = null; p.folded = false; p.looked = false; p.invested = 0; });
   state.pot = 0; state.callAmount = 1;
+  state.firstRoundOver = false; state.actedSet = {}; state.comparePending = null;
   const prevWinner = state.winner;
   state.winner = null;
   // 发牌 + 开局底注：每人押 1 进奖池
@@ -633,6 +635,7 @@ function startLocalRound() {
     if (pi >= 0) { startIdx = localNextFrom(pi); prevName = localPlayer(prevWinner).name; }
   }
   state.current = localSeats()[startIdx];
+  state.roundStarter = state.current;
   state.lastActorDark = false; state.lastActorBet = 1;
   $("round-info").textContent = `第 ${state.round} 局 ｜ 底注 1 ｜ 当前注 ${state.callAmount}${prevName ? " ｜ 上局赢家 " + prevName + " 本局末位行动" : ""}`;
   setMsg("发牌完成，每人押 1 底注，5人局开始！");
@@ -704,6 +707,12 @@ function localDoCompare(id, targetId) {
 /* 推进到下一个未弃牌玩家；若是 AI 则触发其思考 */
 function localNextTurn() {
   if (state.phase !== "betting") return;
+  // 记录刚完成行动的玩家，所有在场玩家都行动过一次后第一轮结束（之后才允许比牌）
+  if (!state.actedSet[state.current]) state.actedSet[state.current] = true;
+  if (!state.firstRoundOver) {
+    const alive = localAlive();
+    if (alive.length && alive.every(id => state.actedSet[id])) state.firstRoundOver = true;
+  }
   const curIdx = localSeats().indexOf(state.current);
   const idx = localNextFrom(curIdx);
   if (idx < 0) { const alive = localAlive(); if (alive.length === 1) localEndRound(alive[0]); return; }
@@ -754,34 +763,85 @@ function aiDecide(id) {
   let done = false;
   if (state.phase !== "betting") return;
   if (!ai.looked) {
-    if (Math.random() < 0.55) { ai.looked = true; setMsg(name + " 看牌了"); }
+    if (Math.random() < 0.55) {
+      ai.looked = true; setMsg(name + " 看牌了");
+      // 看牌后必须行动：继续跟注或加注，不允许跳过
+      const s2 = handScore(ai.hand);
+      if (s2 > 0.6) { const ok = localDoRaise(id); if (ok) setMsg(name + " 看牌后加注至 " + state.callAmount); }
+      else { const ok = localDoCall(id); if (ok) setMsg(name + " 看牌后跟注"); }
+      localNextTurn();
+      return;
+    }
     else if (Math.random() < 0.5 + aggress * 0.2) { const ok = localDoCall(id); if (ok) setMsg(name + " 暗牌跟注 " + state.lastActorBet); }
     else { const ok = localDoRaise(id); if (ok) setMsg(name + " 暗牌加注至 " + state.callAmount); }
   } else {
     if (score > 0.85) { const ok = localDoRaise(id); if (ok) setMsg(name + " 加注至 " + state.callAmount + "（牌很强）"); }
     else if (score > 0.55) { if (Math.random() < 0.45 + aggress * 0.3) { const ok = localDoRaise(id); if (ok) setMsg(name + " 加注施压至 " + state.callAmount); } else { const ok = localDoCall(id); if (ok) setMsg(name + " 跟注"); } }
-    else if (score > 0.28) { if (Math.random() < 0.25 + aggress * 0.15) { if (localDoCompare(id, compareTarget(id))) done = true; } else { const ok = localDoCall(id); if (ok) setMsg(name + " 跟注"); } }
-    else { if (Math.random() < 0.5 + aggress * 0.1) { if (localDoCompare(id, compareTarget(id))) done = true; } else { localDoFold(id); done = true; setMsg(name + " 弃牌"); } }
+    else if (score > 0.28) { if (state.firstRoundOver && Math.random() < 0.25 + aggress * 0.15) { if (localDoCompare(id, compareTarget(id))) done = true; } else { const ok = localDoCall(id); if (ok) setMsg(name + " 跟注"); } }
+    else { if (state.firstRoundOver && Math.random() < 0.5 + aggress * 0.1) { if (localDoCompare(id, compareTarget(id))) done = true; } else { localDoFold(id); done = true; setMsg(name + " 弃牌"); } }
   }
   if (state.phase === "betting" && !done) localNextTurn();
 }
 function compareTarget(id) {
   const alive = localAlive().filter(x => x !== id);
-  const scores = alive.map(x => handScore(localPlayer(x).hand));
-  let minIdx = 0;
-  for (let i = 1; i < scores.length; i++) if (scores[i] < scores[minIdx]) minIdx = i;
-  return alive[minIdx];
+  if (!alive.length) return null;
+  // 公平比牌：AI 从在场对手中随机选择比牌对象（不再自动挑牌最弱者）
+  return alive[Math.floor(Math.random() * alive.length)];
 }
-/* 人机模式：玩家点击比牌弹窗中的目标后执行（目标自选） */
+/* 人机模式：比牌先自动支付当前跟注金额，再选择比牌对象（目标自选） */
+let localComparePending = null;
+function localOpenCompare() {
+  if (state.phase !== "betting" || state.current !== "me") return;
+  if (localComparePending) localCancelCompare(); // 恢复上次未完成的预扣费用
+  const targets = localAlive().filter(x => x !== "me");
+  if (!targets.length) return;
+  if (!state.firstRoundOver) { setMsg("第一轮不能比牌"); return; }
+  const fee = costFor("me");
+  const p = state.me;
+  if (p.chips < fee) { setMsg("筹码不足，无法比牌"); return; }
+  // 先自动支付当前跟注金额，再弹出选择比牌对象
+  p.chips -= fee; p.invested += fee; state.pot += fee;
+  localRecordBet("me", fee);
+  localComparePending = { fee, invested: p.invested, lastActorDark: state.lastActorDark, lastActorBet: state.lastActorBet };
+  renderLocal();
+  if (targets.length === 1) { localPickCompare(targets[0]); return; }
+  $("compare-options").innerHTML = targets.map(t =>
+    `<button class="btn" style="width:80%;margin:6px auto;display:block;" onclick="localPickCompare('${t}');">${localPlayer(t).name}</button>`
+  ).join("");
+  $("compare-modal").classList.add("show");
+}
 function localPickCompare(targetId) {
   $("compare-modal").classList.remove("show");
-  if (state.phase !== "betting" || state.current !== "me") return;
-  localDoCompare("me", targetId);
+  if (state.phase !== "betting" || state.current !== "me") { localCancelCompare(); return; }
+  const p = state.me;
+  const tp = localPlayer(targetId);
+  localComparePending = null;
+  const result = compareHands(p.hand, p.cards, tp.hand, tp.cards);
+  const loserId = result >= 0 ? targetId : "me";
+  localPlayer(loserId).folded = true;
+  setMsg(result >= 0 ? p.name + " 比牌胜出，" + tp.name + " 落败" : tp.name + " 比牌胜出，" + p.name + " 落败");
+  renderLocal();
+  const alive = localAlive();
+  if (alive.length <= 1) { localEndRound(alive[0]); return; }
+  localNextTurn();
+}
+function localCancelCompare() {
+  $("compare-modal").classList.remove("show");
+  if (!localComparePending) return;
+  const p = state.me;
+  p.chips += localComparePending.fee;
+  p.invested = localComparePending.invested;
+  state.pot -= localComparePending.fee;
+  state.lastActorDark = localComparePending.lastActorDark;
+  state.lastActorBet = localComparePending.lastActorBet;
+  localComparePending = null;
+  setMsg("已取消比牌，费用已退回");
+  renderLocal();
 }
 
 /* ========== 人机事件 ========== */
 $("btn-start").addEventListener("click", () => { $("modal").classList.remove("show"); startLocalRound(); });
-$("btn-look").addEventListener("click", () => { if (state.phase !== "betting" || state.current !== "me") return; state.me.looked = true; setMsg("你已看牌：" + state.me.hand.name); renderLocal(); localNextTurn(); });
+$("btn-look").addEventListener("click", () => { if (state.phase !== "betting" || state.current !== "me") return; state.me.looked = true; setMsg("你已看牌：" + state.me.hand.name + "，请继续跟注/加注/比牌或弃牌"); renderLocal(); });
 $("btn-call").addEventListener("click", () => {
   if (state.phase !== "betting" || state.current !== "me") return;
   const min = costFor("me");
@@ -800,16 +860,7 @@ $("btn-raise").addEventListener("click", () => {
   const ok = localDoRaise("me", target); if (!ok) return;
   setMsg("你加注了！当前注 " + state.callAmount); renderLocal(); localNextTurn();
 });
-$("btn-compare").addEventListener("click", () => {
-  if (state.phase !== "betting" || state.current !== "me") return;
-  const targets = localAlive().filter(x => x !== "me");
-  if (targets.length === 0) return;
-  if (targets.length === 1) { localDoCompare("me", targets[0]); return; }
-  $("compare-options").innerHTML = targets.map(t =>
-    `<button class="btn" style="width:80%;margin:6px auto;display:block;" onclick="localPickCompare('${t}');">${localPlayer(t).name}</button>`
-  ).join("");
-  $("compare-modal").classList.add("show");
-});
+$("btn-compare").addEventListener("click", localOpenCompare);
 $("btn-fold").addEventListener("click", () => { if (state.phase !== "betting" || state.current !== "me") return; localDoFold("me"); });
 $("local-bet-input").addEventListener("input", () => { $("local-bet-input").dataset.touched = "1"; });
 $("local-bet-min").addEventListener("click", () => { $("local-bet-input").value = costFor("me"); $("local-bet-input").dataset.touched = "1"; });
@@ -817,7 +868,12 @@ $("local-bet-2x").addEventListener("click", () => { const v = Math.min(costFor("
 $("modal-continue").addEventListener("click", () => { $("modal").classList.remove("show"); startLocalRound(); });
 $("modal-close").addEventListener("click", () => $("modal").classList.remove("show"));
 $("local-back").addEventListener("click", () => { $("modal").classList.remove("show"); showScreen("screen-menu"); updateMenuStats(); });
-$("menu-local").addEventListener("click", () => { showScreen("screen-local"); renderLocal(); });
+$("menu-local").addEventListener("click", () => {
+  showScreen("screen-local");
+  // 从主菜单重新开始游戏：恢复初始 500 筹码
+  localSeats().forEach(id => { localPlayer(id).chips = 500; });
+  renderLocal();
+});
 
 /* =====================================================================
  * 联机对战模式（PeerJS P2P，host 权威）
@@ -831,7 +887,8 @@ const ol = {
   players: [], cards: {}, myCards: [],
   pot: 0, callAmount: 1, current: -1, phase: "lobby", round: 1, stake: 1,
   lock: false, hostConn: null, heartTimer: null,
-  lastActorDark: false, lastActorBet: 1
+  lastActorDark: false, lastActorBet: 1,
+  firstRoundOver: false, roundStarter: 0, actedSet: {}, comparePending: null
 };
 
 function olSeat(seat) { return ol.players.find(p => p.seat === seat); }
@@ -860,7 +917,8 @@ function olPublicState() {
     players: ol.players.map(p => ({ seat: p.seat, name: p.name, chips: p.chips, folded: p.folded, out: p.out, online: p.online, looked: p.looked, invested: p.invested })),
     pot: ol.pot, callAmount: ol.callAmount, current: ol.current, phase: ol.phase,
     round: ol.round, stake: ol.stake, winner: ol.winner, lastAction: ol.lastAction,
-    lastActorDark: ol.lastActorDark, lastActorBet: ol.lastActorBet
+    lastActorDark: ol.lastActorDark, lastActorBet: ol.lastActorBet,
+    firstRoundOver: ol.firstRoundOver
   };
 }
 
@@ -1021,8 +1079,11 @@ function handleHostAction(conn, data) {
   const act = data.action;
   if (act === "look") {
     p.looked = true;
-    ol.lastAction = p.name + " 看牌了";
-    advanceTurn();
+    ol.lastAction = p.name + " 看牌了，请继续下注";
+    // 看牌后必须行动：不推进回合，玩家需继续跟注/加注/比牌或弃牌后才轮到下家
+    olBroadcast(olPublicState());
+    renderOnlineRoom();
+    return;
   } else if (act === "call") {
     const min = olCostFor(p);
     if (p.chips < min) { conn.send({ type: "err", msg: "筹码不足" }); return; }
@@ -1044,6 +1105,7 @@ function handleHostAction(conn, data) {
     olRecordBet(data.seat, target);
     advanceTurn();
   } else if (act === "compare") {
+    if (!ol.firstRoundOver) { conn.send({ type: "err", msg: "第一轮不能比牌，请先跟注/加注/弃牌" }); return; }
     const target = data.target;
     const tp = ol.players[target];
     if (!tp || tp.folded || tp.out || !tp.online || target === p.seat) return;
@@ -1075,6 +1137,9 @@ function handleHostAction(conn, data) {
 function advanceTurn() {
   const alive = olAlive();
   if (alive.length <= 1) return;
+  // 记录刚完成行动的玩家；所有在场玩家都行动过一次后，第一轮结束（之后才允许比牌）
+  if (!ol.actedSet[ol.current]) ol.actedSet[ol.current] = true;
+  if (!ol.firstRoundOver && alive.every(p => ol.actedSet[p.seat])) ol.firstRoundOver = true;
   let next = ol.current;
   for (let i = 0; i < ol.players.length; i++) {
     next = (next + 1) % ol.players.length;
@@ -1104,11 +1169,12 @@ function hostStartGame() {
   ol.stake = 1;
   ol.winner = null;
   ol.lastAction = "新一局开始";
-  // 重置
-  ol.players.forEach(p => { p.chips = 500; p.folded = false; p.out = false; p.looked = false; p.invested = 0; });
+  // 开局筹码沿用上局余额（跨局累积），不重置为 500
+  ol.players.forEach(p => { p.folded = false; p.out = false; p.looked = false; p.invested = 0; });
   ol.cards = {};
   ol.pot = 0; ol.callAmount = 1; ol.current = 0;
   ol.lastActorDark = false; ol.lastActorBet = 1;
+  ol.firstRoundOver = false; ol.actedSet = {}; ol.roundStarter = 0;
   deal();
 }
 
@@ -1165,12 +1231,14 @@ function hostNextRound() {
   const prevWinner = ol.winner;
   ol.phase = "betting";
   ol.round++;
-  ol.players.forEach(p => { p.chips = 500; p.folded = false; p.out = false; p.looked = false; p.invested = 0; });
+  // 下一局筹码沿用上局结算后余额（跨局累积），不重置为 500
+  ol.players.forEach(p => { p.folded = false; p.out = false; p.looked = false; p.invested = 0; });
   ol.cards = {};
   ol.pot = 0; ol.callAmount = 1;
   ol.current = (prevWinner !== null && prevWinner !== undefined && prevWinner >= 0) ? (prevWinner + 1) % ol.players.length : 0;
   ol.lastActorDark = false; ol.lastActorBet = 1;
   ol.winner = null;
+  ol.firstRoundOver = false; ol.actedSet = {}; ol.roundStarter = ol.current;
   ol.lastAction = "第 " + ol.round + " 局开始" + (prevWinner !== null && prevWinner !== undefined && prevWinner >= 0 ? "（上局赢家" + ol.players[prevWinner].name + "本局末位行动）" : "");
   olBroadcast({ type: "new_round", round: ol.round });
   deal();
@@ -1245,6 +1313,7 @@ function applyPublicState(st) {
   ol.round = st.round; ol.stake = st.stake; ol.winner = st.winner; ol.lastAction = st.lastAction;
   ol.lastActorDark = st.lastActorDark !== undefined ? st.lastActorDark : false;
   ol.lastActorBet = st.lastActorBet !== undefined ? st.lastActorBet : 0;
+  ol.firstRoundOver = st.firstRoundOver !== undefined ? st.firstRoundOver : false;
 }
 
 /* ---- 联机 UI 渲染 ---- */
@@ -1320,11 +1389,11 @@ function renderOnlineRoom() {
   $("ol-btn-look").disabled = !(myTurn && !myLooked);
   $("ol-btn-call").disabled = !myTurn;
   $("ol-btn-raise").disabled = !myTurn;
-  $("ol-btn-compare").disabled = !(myTurn && olAlive().filter(p => p.seat !== ol.mySeat).length > 0);
+  $("ol-btn-compare").disabled = !(myTurn && ol.firstRoundOver && olAlive().filter(p => p.seat !== ol.mySeat).length > 0);
   $("ol-btn-fold").disabled = !myTurn;
   const myCost = me && ol.phase === "betting" ? olCostFor(me) : 0;
   $("ol-btn-call").textContent = myLooked ? ("看牌跟注 " + myCost) : ("暗牌跟注 " + myCost);
-  $("ol-btn-compare").textContent = "比牌 " + myCost;
+  $("ol-btn-compare").textContent = (ol.firstRoundOver ? "比牌 " + myCost : "第一轮不能比牌");
   $("ol-btn-fold").textContent = "弃牌";
   $("ol-btn-look").textContent = "看牌";
   if (ol.phase === "showdown") { ["ol-btn-look","ol-btn-call","ol-btn-raise","ol-btn-compare","ol-btn-fold"].forEach(id => $(id).style.display = "none"); }
@@ -1422,7 +1491,7 @@ $("net-back").addEventListener("click", () => {
   renderLocal();
 });
 $("ol-btn-start").addEventListener("click", hostStartGame);
-$("ol-btn-look").addEventListener("click", () => { olSendAction("look"); const me = olSeat(ol.mySeat); if (me) { me.looked = true; } renderOnlineRoom(); });
+$("ol-btn-look").addEventListener("click", () => { olSendAction("look"); const me = olSeat(ol.mySeat); if (me) { me.looked = true; } renderOnlineRoom(); toast("已看牌，请继续跟注/加注/比牌或弃牌"); });
 $("ol-btn-call").addEventListener("click", () => { const me = olSeat(ol.mySeat); if (!me) return; const min = olCostFor(me); let amt = parseInt($("ol-bet-input").value, 10); if (isNaN(amt) || amt < min) amt = min; amt = Math.min(amt, me.chips); olSendAction("call", undefined, amt); });
 $("ol-btn-raise").addEventListener("click", () => { let target = parseInt($("ol-bet-input").value, 10); if (isNaN(target) || target < olMinRaiseCall()) target = olMinRaiseCall(); olSendAction("raise", undefined, undefined, target); });
 $("ol-btn-fold").addEventListener("click", () => olSendAction("fold"));
@@ -1436,6 +1505,7 @@ $("ol-bet-input").addEventListener("input", () => {
 $("ol-bet-min").addEventListener("click", () => { const me = olSeat(ol.mySeat); const min = me ? olCostFor(me) : 1; $("ol-bet-input").value = Math.min(min, me ? me.chips : 500); $("ol-bet-input").dataset.touched = "1"; const minRaise = olMinRaiseCall(); $("ol-btn-raise").textContent = "加注 至 " + (min < minRaise ? minRaise : min); });
 $("ol-bet-2x").addEventListener("click", () => { const me = olSeat(ol.mySeat); const min = me ? olCostFor(me) : 1; $("ol-bet-input").value = Math.min(min * 2, me ? me.chips : 500); $("ol-bet-input").dataset.touched = "1"; const minRaise = olMinRaiseCall(); const v = Math.min(min * 2, me ? me.chips : 500); $("ol-btn-raise").textContent = "加注 至 " + (v < minRaise ? minRaise : v); });
 $("ol-btn-compare").addEventListener("click", () => {
+  if (!ol.firstRoundOver) { toast("第一轮不能比牌，请先跟注/加注/弃牌"); return; }
   const targets = olAlive().filter(p => p.seat !== ol.mySeat);
   if (targets.length === 0) return;
   if (targets.length === 1) { olSendAction("compare", targets[0].seat); return; }
@@ -1444,7 +1514,7 @@ $("ol-btn-compare").addEventListener("click", () => {
   ).join("");
   $("compare-modal").classList.add("show");
 });
-$("compare-cancel").addEventListener("click", () => $("compare-modal").classList.remove("show"));
+$("compare-cancel").addEventListener("click", localCancelCompare);
 $("ol-modal-close").addEventListener("click", () => $("ol-modal").classList.remove("show"));
 $("ol-modal-next").addEventListener("click", () => { $("ol-modal").classList.remove("show"); hostNextRound(); });
 
