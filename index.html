@@ -186,7 +186,7 @@ body {
   <div class="screen show" id="screen-menu">
     <div class="menu-inner">
       <div class="logo">🃏 炸金花</div>
-      <div class="menu-sub">3-10 人在线联机 · 自定义房间码 · 赢家轮庄 · 暗拍跟注 · 积分累积</div>
+      <div class="menu-sub">2-10 人在线联机 · 自定义房间码 · 赢家轮庄 · 暗拍跟注 · 积分累积</div>
       <button class="menu-btn primary" id="menu-local">🤖 人机对战</button>
       <button class="menu-btn online" id="menu-online">🌐 联机对战</button>
       <button class="menu-btn score" id="menu-score">🏆 积分榜</button>
@@ -241,7 +241,7 @@ body {
     <div id="ol-lobby">
       <div class="ol-card">
         <h3>🎲 创建房间</h3>
-        <p style="font-size:12px;color:#bcd9c5;margin-bottom:6px;">自定义房间码（4-8位字母/数字），留空则随机生成（3-10人）</p>
+        <p style="font-size:12px;color:#bcd9c5;margin-bottom:6px;">自定义房间码（4-8位字母/数字），留空则随机生成（2-10人）</p>
         <input id="ol-code-create" placeholder="自定义房间码（4-8位）" maxlength="8" autocomplete="off" style="letter-spacing:3px;">
         <div style="display:flex;gap:8px;justify-content:center;">
           <button class="btn" id="ol-code-random" style="width:130px;">🎲 随机生成</button>
@@ -1083,7 +1083,7 @@ function checkAutoEnd() {
 function hostStartGame() {
   if (ol.phase !== "lobby" || !ol.isHost) return;
   const alivePlayers = ol.players.filter(p => p.online);
-  if (alivePlayers.length < 3) { toast("至少需要3名玩家才能开局"); return; }
+  if (alivePlayers.length < 2) { toast("至少需要2名玩家才能开局"); return; }
   ol.phase = "betting";
   ol.round = 1;
   ol.stake = 1;
@@ -1102,9 +1102,13 @@ function deal() {
   ol.players.forEach(p => {
     const cards = [deck.pop(), deck.pop(), deck.pop()];
     ol.cards[p.seat] = cards;
-    const conn = ol.conns[p.seat - 1];
-    if (conn && conn.open) {
-      conn.send({ type: "deal", seat: p.seat, cards: cards });
+    if (p.seat === ol.mySeat) {
+      ol.myCards = cards; // 房主/本地玩家自己的手牌（无连接，不走 conn.send）
+    } else {
+      const conn = ol.conns[p.seat - 1];
+      if (conn && conn.open) {
+        conn.send({ type: "deal", seat: p.seat, cards: cards });
+      }
     }
   });
   // 底注
@@ -1182,6 +1186,7 @@ function handleGuestMessage(data) {
     renderOnlineRoom();
   } else if (data.type === "deal") {
     ol.myCards = data.cards;
+    renderOnlineRoom();
   } else if (data.type === "game_start") {
     ol.pot = data.pot; ol.callAmount = data.callAmount; ol.stake = data.stake; ol.round = data.round;
   } else if (data.type === "state") {
@@ -1268,7 +1273,7 @@ function renderOnlineRoom() {
   const me = olSeat(ol.mySeat);
   const myTurn = ol.phase === "betting" && ol.current === ol.mySeat && me && !me.folded && !me.out;
   if (ol.phase === "lobby") {
-    $("ol-msg").textContent = host ? "点击开始游戏（至少3人）" : "等待房主开始游戏…";
+    $("ol-msg").textContent = host ? "点击开始游戏（至少2人）" : "等待房主开始游戏…";
   } else if (ol.phase === "betting") {
     if (me && me.folded) $("ol-msg").textContent = "你已弃牌，等待本局结束";
     else if (myTurn) $("ol-msg").textContent = "轮到你了！";
@@ -1283,7 +1288,7 @@ function renderOnlineRoom() {
   // 按钮
   const showActions = host && ol.phase === "lobby";
   $("ol-btn-start").style.display = showActions ? "" : "none";
-  $("ol-btn-start").disabled = !(host && ol.phase === "lobby" && ol.players.filter(p => p.online).length >= 3);
+  $("ol-btn-start").disabled = !(host && ol.phase === "lobby" && ol.players.filter(p => p.online).length >= 2);
   $("ol-btn-start").textContent = "开始游戏";
   const act = showActions ? "none" : "";
   ["ol-btn-look", "ol-btn-call", "ol-btn-raise", "ol-btn-compare", "ol-btn-fold"].forEach(id => $(id).style.display = act);
