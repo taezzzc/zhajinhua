@@ -180,7 +180,6 @@ body {
 </style>
 </head>
 <body>
-<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 <div id="app">
 
   <!-- 主菜单 -->
@@ -339,11 +338,60 @@ body {
   </div>
 </div>
 
+<!-- 联机不可用弹窗 -->
+<div class="modal-mask" id="net-modal">
+  <div class="modal">
+    <h2>🌐 联机不可用</h2>
+    <div class="sub" id="net-modal-msg">联机功能需要联网加载 PeerJS，当前加载失败。</div>
+    <div class="btn-row">
+      <button class="btn primary" id="net-retry">🔄 重试</button>
+      <button class="btn" id="net-back">返回人机</button>
+    </div>
+  </div>
+</div>
+
 <script>
 "use strict";
 
 /* ========== 工具函数 ========== */
 const $ = id => document.getElementById(id);
+
+/* ========== PeerJS 动态加载（带状态跟踪，失败绝不静默降级） ========== */
+const PEERJS_URL = "https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js";
+const PEERJS_TIMEOUT = 8000;
+let peerjsState = "loading"; // loading | ok | fail
+let peerjsWaiters = [];
+function notifyPeerWaiters(ok) {
+  const ws = peerjsWaiters;
+  peerjsWaiters = [];
+  ws.forEach(w => { try { w(ok); } catch (e) {} });
+}
+function injectPeerJS() {
+  peerjsState = "loading";
+  const s = document.createElement("script");
+  s.src = PEERJS_URL;
+  s.onload = () => { peerjsState = "ok"; notifyPeerWaiters(true); };
+  s.onerror = () => { peerjsState = "fail"; notifyPeerWaiters(false); };
+  document.head.appendChild(s);
+  setTimeout(() => {
+    if (peerjsState === "loading") { peerjsState = "fail"; notifyPeerWaiters(false); }
+  }, PEERJS_TIMEOUT);
+}
+function ensurePeerJS(cb) {
+  if (peerjsState === "ok") { cb(true); return; }
+  if (peerjsState === "loading") { peerjsWaiters.push(cb); return; }
+  peerjsWaiters.push(cb);
+  injectPeerJS();
+}
+injectPeerJS(); // 页面加载即预加载
+
+/* ========== 联机不可用弹窗（明确提示，用户选择重试或返回人机） ========== */
+function showNetModal(msg) {
+  $("net-modal-msg").textContent = msg || "联机功能需要联网加载 PeerJS，当前加载失败。";
+  $("net-modal").classList.add("show");
+}
+function hideNetModal() { $("net-modal").classList.remove("show"); }
+
 const SUITS = [
   { symbol: "♠", name: "黑桃", color: "black" },
   { symbol: "♥", name: "红心", color: "red" },
@@ -804,7 +852,11 @@ function olPublicState() {
 /* ---- 创建房间（支持自定义房间码） ---- */
 function createRoom(customCode) {
   cleanupOnline();
-  if (typeof Peer === "undefined") { toast("联机库加载失败（需联网），已切换人机模式"); showScreen("screen-local"); renderLocal(); return; }
+  if (typeof Peer === "undefined") {
+    toast("联机库加载失败（需联网）");
+    showNetModal("联机功能需要联网加载 PeerJS，当前加载失败，无法创建房间。\n请检查网络后重试，或返回人机对战。");
+    return;
+  }
   let userCode = "";
   if (customCode !== undefined) {
     userCode = String(customCode).trim().toUpperCase().replace(/\s+/g, "");
@@ -864,9 +916,8 @@ function createRoom(customCode) {
         }
       } else if (err.type === "network" || err.type === "server-error" || err.type === "socket-error" || err.type === "socket-closed") {
         cleanupOnline();
-        toast("无法连接联机服务器，已切换人机模式");
-        showScreen("screen-local");
-        renderLocal();
+        toast("无法连接联机服务器");
+        showNetModal("无法连接联机服务器（" + err.type + "），创建房间失败。\n请检查网络后重试，或返回人机对战。");
       }
     });
   };
@@ -876,7 +927,11 @@ function createRoom(customCode) {
 /* ---- 加入房间 ---- */
 function joinRoom() {
   cleanupOnline();
-  if (typeof Peer === "undefined") { toast("联机库加载失败（需联网），已切换人机模式"); showScreen("screen-local"); renderLocal(); return; }
+  if (typeof Peer === "undefined") {
+    toast("联机库加载失败（需联网）");
+    showNetModal("联机功能需要联网加载 PeerJS，当前加载失败，无法加入房间。\n请检查网络后重试，或返回人机对战。");
+    return;
+  }
   const code = $("ol-code-input").value.trim().toUpperCase().replace(/\s+/g, "");
   if (!/^[A-Z0-9]{4,8}$/.test(code)) { toast("请输入4-8位房间码"); return; }
   $("ol-status").textContent = "正在连接房间 " + code + "…";
@@ -894,11 +949,13 @@ function joinRoom() {
     conn.on("error", () => { toast("与房主连接失败"); });
   });
   peer.on("error", err => {
-    if (err.type === "network" || err.type === "server-error" || err.type === "socket-error" || err.type === "socket-closed" || err.type === "peer-unavailable") {
+    if (err.type === "network" || err.type === "server-error" || err.type === "socket-error" || err.type === "socket-closed") {
       cleanupOnline();
-      toast("无法连接联机服务器，已切换人机模式");
-      showScreen("screen-local");
-      renderLocal();
+      toast("无法连接联机服务器");
+      showNetModal("无法连接联机服务器（" + err.type + "），加入房间失败。\n请检查网络后重试，或返回人机对战。");
+    } else if (err.type === "peer-unavailable") {
+      cleanupOnline();
+      toast("未找到房间 " + code + "，请确认房间码");
     }
   });
 }
@@ -1296,13 +1353,45 @@ function cleanupOnline() {
 }
 
 /* ---- 联机事件 ---- */
-$("menu-online").addEventListener("click", () => { showScreen("screen-online"); $("ol-lobby").style.display = "block"; $("ol-room").style.display = "none"; $("ol-status").textContent = ""; });
+$("menu-online").addEventListener("click", () => {
+  showScreen("screen-online");
+  $("ol-lobby").style.display = "block";
+  $("ol-room").style.display = "none";
+  $("ol-status").textContent = "正在加载联机组件…";
+  ensurePeerJS(ok => {
+    if (!ok) {
+      $("ol-status").textContent = "";
+      showNetModal("联机功能需要联网加载 PeerJS，当前加载失败，无法进入联机大厅。\n请检查网络后重试，或返回人机对战。");
+      return;
+    }
+    $("ol-status").textContent = "";
+  });
+});
 $("ol-create").addEventListener("click", () => createRoom($("ol-code-create").value));
 $("ol-code-random").addEventListener("click", () => { $("ol-code-create").value = genCode(4); });
 $("ol-code-create").addEventListener("input", e => { e.target.value = e.target.value.toUpperCase().replace(/\s+/g, ""); });
 $("ol-code-input").addEventListener("input", e => { e.target.value = e.target.value.toUpperCase().replace(/\s+/g, ""); });
 $("ol-join").addEventListener("click", joinRoom);
 $("ol-back").addEventListener("click", () => { cleanupOnline(); showScreen("screen-menu"); updateMenuStats(); });
+$("net-retry").addEventListener("click", () => {
+  hideNetModal();
+  $("ol-status").textContent = "正在重新加载联机组件…";
+  ensurePeerJS(ok => {
+    if (!ok) {
+      $("ol-status").textContent = "";
+      showNetModal("仍无法加载联机组件，请检查网络后重试，或返回人机对战。");
+      return;
+    }
+    $("ol-status").textContent = "";
+    toast("联机组件加载成功，请重新创建/加入房间");
+  });
+});
+$("net-back").addEventListener("click", () => {
+  hideNetModal();
+  cleanupOnline();
+  showScreen("screen-local");
+  renderLocal();
+});
 $("ol-btn-start").addEventListener("click", hostStartGame);
 $("ol-btn-look").addEventListener("click", () => { olSendAction("look"); const me = olSeat(ol.mySeat); if (me) { me.looked = true; } renderOnlineRoom(); });
 $("ol-btn-call").addEventListener("click", () => { const me = olSeat(ol.mySeat); if (!me) return; const min = olCostFor(me); let amt = parseInt($("ol-bet-input").value, 10); if (isNaN(amt) || amt < min) amt = min; amt = Math.min(amt, me.chips); olSendAction("call", undefined, amt); });
