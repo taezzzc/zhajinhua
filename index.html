@@ -40,20 +40,20 @@ body {
 .room-info { display: flex; flex-direction: column; align-items: flex-end; font-size: 12px; color: #bcd9c5; line-height: 1.5; }
 .room-info b { color: #ffd76a; }
 
-/* 玩家区域（人机） */
-.players { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
-.player-box { flex: 1; background: rgba(0,0,0,0.28); border: 2px solid rgba(255,255,255,0.12); border-radius: 14px; padding: 8px; position: relative; min-height: 118px; transition: border-color .2s; }
+/* 玩家区域（人机5人局） */
+.players { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-bottom: 10px; }
+.player-box { flex: 1 1 18%; min-width: 150px; background: rgba(0,0,0,0.28); border: 2px solid rgba(255,255,255,0.12); border-radius: 14px; padding: 8px; position: relative; min-height: 118px; transition: border-color .2s; }
 .player-box.active { border-color: #ffd76a; box-shadow: 0 0 14px rgba(255,215,106,.25); }
 .player-box.winner { border-color: #7dff9b; box-shadow: 0 0 16px rgba(125,255,155,.35); }
 .player-box.loser { opacity: .55; }
-.player-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-.avatar { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: bold; flex-shrink: 0; }
+.player-head { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.avatar { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; flex-shrink: 0; }
 .avatar.me { background: #3a7bd5; }
 .avatar.ai { background: #c0392b; }
-.player-name { font-size: 14px; font-weight: bold; }
+.player-name { font-size: 13px; font-weight: bold; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .badge { font-size: 10px; padding: 1px 6px; border-radius: 8px; background: rgba(255,215,106,.2); color: #ffd76a; margin-left: 4px; }
-.chips-line { font-size: 13px; color: #ffd76a; margin-left: auto; font-weight: bold; }
-.status-line { font-size: 12px; color: #bcd9c5; min-height: 16px; margin-top: 2px; }
+.chips-line { font-size: 12px; color: #ffd76a; margin-left: auto; font-weight: bold; }
+.status-line { font-size: 11px; color: #bcd9c5; min-height: 14px; margin-top: 2px; }
 
 /* 牌区 */
 .cards-area { display: flex; gap: 6px; margin-top: 4px; justify-content: center; }
@@ -189,31 +189,11 @@ body {
         <span>第 <b id="round-count">1</b> 局</span>
       </div>
     </div>
-    <div class="players">
-      <div class="player-box" id="box-me">
-        <div class="player-head">
-          <div class="avatar me">我</div>
-          <span class="player-name">我 <span class="badge" id="me-vision">未看牌</span></span>
-          <span class="chips-line">💰 <span id="me-chips">1000</span></span>
-        </div>
-        <div class="cards-area" id="me-cards"></div>
-        <div class="status-line" id="me-status"></div>
-      </div>
-      <div class="player-box" id="box-ai">
-        <div class="player-head">
-          <div class="avatar ai">AI</div>
-          <span class="player-name">电脑 <span class="badge" id="ai-vision">未看牌</span></span>
-          <span class="chips-line">💰 <span id="ai-chips">1000</span></span>
-        </div>
-        <div class="cards-area" id="ai-cards"></div>
-        <div class="status-line" id="ai-status"></div>
-      </div>
-    </div>
+    <div class="players" id="local-players"></div>
     <div class="table-center">
       <div class="pot-area"><small>底池</small>💰 <span id="pot">0</span></div>
       <div class="round-info" id="round-info">等待开始…</div>
       <div class="msg" id="msg">点击下方按钮开始游戏</div>
-      <div class="ai-think" id="ai-think"></div>
     </div>
     <div class="actions">
       <button class="btn look" id="btn-look" disabled>看牌</button>
@@ -228,7 +208,7 @@ body {
       <input type="range" id="stake-range" min="5" max="50" step="5" value="10">
       <span class="val" id="stake-label">10</span><span>元</span>
     </div>
-    <div class="hint">豹子 &gt; 同花顺 &gt; 金花 &gt; 顺子 &gt; 对子 &gt; 单张 ｜ 235 吃豹子<br>暗拍规则：上家暗牌压X，你明牌跟 2X、暗牌跟 X/2（不低于底注一半）｜ 赢家下局末位行动</div>
+    <div class="hint">人机5人局：你 + 4名AI对手（小刚/小红/小强/小美）｜ 豹子 &gt; 同花顺 &gt; 金花 &gt; 顺子 &gt; 对子 &gt; 单张 ｜ 235 吃豹子<br>暗拍规则：上家暗牌压X，你明牌跟 2X、暗牌跟 X/2（不低于底注一半）｜ 赢家下局末位行动</div>
   </div>
 
   <!-- 联机对战 -->
@@ -456,45 +436,55 @@ function cardHTML(card, faceUp, sm) {
 /* =====================================================================
  * 人机对战模式
  * ===================================================================== */
+const AI_NAMES = ["小刚", "小红", "小强", "小美"];
 const state = {
   phase: "idle", deck: [],
-  me: { cards: [], hand: null, chips: 1000, folded: false, looked: false },
-  ai: { cards: [], hand: null, chips: 1000, folded: false, looked: false },
+  me: { id: "me", name: "我", cards: [], hand: null, chips: 1000, folded: false, looked: false, invested: 0 },
+  ais: AI_NAMES.map((n, i) => ({ id: "ai" + i, name: n, cards: [], hand: null, chips: 1000, folded: false, looked: false, invested: 0 })),
   pot: 0, stake: 10, round: 1, current: "me", callAmount: 10,
-  meInvested: 0, aiInvested: 0, winner: null, lock: false,
+  winner: null, lock: false,
   lastActorDark: false, lastActorBet: 0
 };
+function localSeats() { return ["me", "ai0", "ai1", "ai2", "ai3"]; }
+function localPlayer(id) { return id === "me" ? state.me : state.ais[parseInt(id.slice(2), 10)]; }
+function localAlive() { return localSeats().filter(id => !localPlayer(id).folded); }
+/* 从 startIdx（座位下标）的下一位开始，找第一个未弃牌的玩家座位下标 */
+function localNextFrom(startIdx) {
+  const seats = localSeats();
+  for (let k = 1; k <= seats.length; k++) {
+    const idx = (startIdx + k) % seats.length;
+    if (!localPlayer(seats[idx]).folded) return idx;
+  }
+  return -1;
+}
+function localRecordBet(id, cost) { const p = localPlayer(id); state.lastActorDark = p.looked; state.lastActorBet = cost; }
 
 function renderLocal() {
-  const showMeFace = state.me.looked || state.phase === "showdown" || state.me.folded;
-  const showAiFace = state.phase === "showdown";
-  $("me-cards").innerHTML = state.me.cards.length
-    ? state.me.cards.map(c => cardHTML(c, showMeFace)).join("")
-    : `<span style="color:#6f8f7a;font-size:12px;">等待发牌</span>`;
-  $("ai-cards").innerHTML = state.ai.cards.length
-    ? state.ai.cards.map(c => cardHTML(c, showAiFace)).join("")
-    : `<span style="color:#6f8f7a;font-size:12px;">等待发牌</span>`;
-  $("me-chips").textContent = state.me.chips;
-  $("ai-chips").textContent = state.ai.chips;
+  const wrap = $("local-players");
+  wrap.innerHTML = localSeats().map(id => {
+    const p = localPlayer(id);
+    const isMe = id === "me";
+    const showFace = isMe ? (state.phase === "showdown" || p.looked || p.folded) : state.phase === "showdown";
+    const cardsHtml = p.cards.length
+      ? p.cards.map(c => cardHTML(c, showFace, true)).join("")
+      : `<span style="color:#6f8f7a;font-size:11px;">等待发牌</span>`;
+    const cls = ["player-box"];
+    if (state.phase === "betting" && state.current === id && !p.folded) cls.push("active");
+    if (state.winner === id) cls.push("winner");
+    if (p.folded && state.phase !== "showdown") cls.push("loser");
+    return `<div class="${cls.join(" ")}">
+      <div class="player-head">
+        <div class="avatar ${isMe ? "me" : "ai"}">${isMe ? "我" : p.name.charAt(0)}</div>
+        <span class="player-name">${p.name}<span class="badge">${p.looked ? "已看" : "未看"}</span></span>
+        <span class="chips-line">💰 ${p.chips}</span>
+      </div>
+      <div class="cards-area" style="justify-content:center;">${cardsHtml}</div>
+      <div class="status-line">${p.folded ? "已弃牌" : (p.looked ? "已看牌" : "未看牌")}${p.invested > 0 ? " · 投入 " + p.invested : ""}</div>
+    </div>`;
+  }).join("");
   $("pot").textContent = state.pot;
   $("round-count").textContent = state.round;
   $("stake-show").textContent = state.stake;
-  $("me-vision").textContent = state.me.looked ? "已看牌" : "未看牌";
-  $("ai-vision").textContent = state.ai.looked ? "已看牌" : "未看牌";
-  $("box-me").classList.toggle("active", state.current === "me" && state.phase === "betting");
-  $("box-ai").classList.toggle("active", state.current === "ai" && state.phase === "betting");
-  $("box-me").classList.toggle("winner", state.winner === "me");
-  $("box-ai").classList.toggle("winner", state.winner === "ai");
-  $("box-me").classList.toggle("loser", state.me.folded && state.phase !== "showdown");
-  $("box-ai").classList.toggle("loser", state.ai.folded && state.phase !== "showdown");
-  const meSt = [];
-  if (state.me.folded) meSt.push("已弃牌");
-  if (state.meInvested > 0) meSt.push("投入 " + state.meInvested);
-  $("me-status").textContent = meSt.join(" · ");
-  const aiSt = [];
-  if (state.ai.folded) aiSt.push("已弃牌");
-  if (state.aiInvested > 0) aiSt.push("投入 " + state.aiInvested);
-  $("ai-status").textContent = aiSt.join(" · ");
   const lb = loadLocalBoard();
   $("local-score").textContent = lb.score;
   renderLocalActions();
@@ -507,7 +497,7 @@ function renderLocalActions() {
   $("btn-look").disabled = !(myTurn && !looked);
   $("btn-call").disabled = !myTurn;
   $("btn-raise").disabled = !myTurn;
-  $("btn-compare").disabled = !(myTurn && !state.ai.folded);
+  $("btn-compare").disabled = !(myTurn && localAlive().length > 1);
   $("btn-fold").disabled = !myTurn;
   $("btn-start").disabled = betting || state.phase === "showdown";
   $("btn-look").textContent = "看牌";
@@ -521,123 +511,144 @@ function renderLocalActions() {
 
 function setMsg(t, small) { $("msg").textContent = t; $("msg").className = "msg" + (small ? " small" : ""); }
 /* 跟注金额：上家暗牌压 X → 看牌跟 2X、暗牌跟 X/2（向下取整，最低底注一半）；上家明牌沿用原规则 */
-function costFor(player) {
-  const looked = state[player].looked;
+function costFor(id) {
+  const p = localPlayer(id);
   if (state.lastActorDark) {
-    if (looked) return 2 * state.lastActorBet;
+    if (p.looked) return 2 * state.lastActorBet;
     return Math.max(Math.floor(state.lastActorBet / 2), Math.floor(state.stake / 2));
   }
-  return looked ? state.callAmount : Math.max(1, Math.ceil(state.callAmount / 2));
+  return p.looked ? state.callAmount : Math.max(1, Math.ceil(state.callAmount / 2));
 }
-function localRecordBet(player, cost) { state.lastActorDark = state[player].looked; state.lastActorBet = cost; }
 
 function startLocalRound() {
   if (state.lock) return;
   const need = state.stake;
-  if (state.me.chips < need && state.ai.chips < need) { setMsg("双方筹码不足，游戏结束"); state.phase = "gameover"; renderLocal(); return; }
+  if (localSeats().every(id => localPlayer(id).chips < need)) { setMsg("所有玩家筹码不足，游戏结束"); state.phase = "gameover"; renderLocal(); return; }
   state.lock = true;
   state.phase = "betting";
   state.deck = shuffle(makeDeck());
-  state.me = { ...state.me, cards: [], hand: null, folded: false, looked: false };
-  state.ai = { ...state.ai, cards: [], hand: null, folded: false, looked: false };
-  state.pot = 0; state.meInvested = 0; state.aiInvested = 0;
+  localSeats().forEach(id => { const p = localPlayer(id); p.cards = []; p.hand = null; p.folded = false; p.looked = false; p.invested = 0; });
+  state.pot = 0; state.callAmount = state.stake;
   const prevWinner = state.winner;
-  state.winner = null; state.callAmount = state.stake;
-  state.me.cards = [state.deck.pop(), state.deck.pop(), state.deck.pop()];
-  state.ai.cards = [state.deck.pop(), state.deck.pop(), state.deck.pop()];
-  state.me.hand = evaluateHand(state.me.cards);
-  state.ai.hand = evaluateHand(state.ai.cards);
-  const meFee = Math.min(state.stake, state.me.chips);
-  const aiFee = Math.min(state.stake, state.ai.chips);
-  state.me.chips -= meFee; state.meInvested += meFee;
-  state.ai.chips -= aiFee; state.aiInvested += aiFee;
-  state.pot = meFee + aiFee;
-  // 赢家轮庄：上局赢家本局末位行动，其余按座位顺序依次行动（人机：赢家是"我"则电脑先动）
-  state.current = prevWinner === "me" ? "ai" : "me";
+  state.winner = null;
+  localSeats().forEach(id => {
+    const p = localPlayer(id);
+    p.cards = [state.deck.pop(), state.deck.pop(), state.deck.pop()];
+    p.hand = evaluateHand(p.cards);
+    const fee = Math.min(state.stake, p.chips);
+    p.chips -= fee; p.invested += fee; state.pot += fee;
+  });
+  // 赢家轮庄：上局赢家本局末位行动，其余按座位顺序依次行动（首行动者=赢家的下一位）
+  let startIdx = 0; let prevName = "";
+  if (prevWinner) {
+    const pi = localSeats().indexOf(prevWinner);
+    if (pi >= 0) { startIdx = localNextFrom(pi); prevName = localPlayer(prevWinner).name; }
+  }
+  state.current = localSeats()[startIdx];
   state.lastActorDark = false; state.lastActorBet = state.callAmount;
-  $("round-info").textContent = `第 ${state.round} 局 ｜ 底注 ${state.stake} ｜ 当前注 ${state.callAmount}${prevWinner ? " ｜ 上局赢家：我，本局后手" : ""}`;
-  setMsg("发牌完成，轮到你了。先看牌或跟注（暗拍跟注可压上家半价）");
+  $("round-info").textContent = `第 ${state.round} 局 ｜ 底注 ${state.stake} ｜ 当前注 ${state.callAmount}${prevName ? " ｜ 上局赢家 " + prevName + " 本局末位行动" : ""}`;
+  setMsg("发牌完成，5人局开始！");
   renderLocal();
   state.lock = false;
-  if (state.current === "ai") aiTurn();
+  if (state.current !== "me") aiAct(state.current);
 }
 
-function localDoCall(player) {
-  const cost = costFor(player);
-  const p = state[player];
-  if (p.chips < cost) { setMsg("筹码不足，无法跟注"); return false; }
-  p.chips -= cost; state.pot += cost;
-  if (player === "me") state.meInvested += cost; else state.aiInvested += cost;
-  localRecordBet(player, cost);
+function localDoCall(id) {
+  const cost = costFor(id);
+  const p = localPlayer(id);
+  if (p.chips < cost) { setMsg((id === "me" ? "你" : p.name) + "筹码不足，无法跟注"); return false; }
+  p.chips -= cost; p.invested += cost; state.pot += cost;
+  localRecordBet(id, cost);
   return true;
 }
-function localDoRaise(player) {
-  const looked = state[player].looked;
+function localDoRaise(id) {
+  const p = localPlayer(id);
+  const looked = p.looked;
   let newCall = state.callAmount * 2;
-  const p = state[player];
-  const maxByMe = p.chips + (player === "me" ? state.meInvested : state.aiInvested);
-  const maxByOpp = state[player === "me" ? "ai" : "me"].chips + state[player === "me" ? "aiInvested" : "meInvested"];
-  newCall = Math.min(newCall, Math.max(state.callAmount, Math.min(maxByMe, maxByOpp)));
+  const maxByMe = p.chips + p.invested;
+  const oppMax = Math.max.apply(null, localAlive().filter(x => x !== id).map(x => localPlayer(x).chips + localPlayer(x).invested));
+  newCall = Math.min(newCall, Math.max(state.callAmount, Math.min(maxByMe, oppMax)));
   const cost = looked ? (newCall - state.callAmount) : Math.max(1, Math.ceil((newCall - state.callAmount) / 2));
-  if (p.chips < cost) { setMsg("筹码不足，无法加注"); return false; }
-  p.chips -= cost; state.pot += cost;
-  if (player === "me") state.meInvested += cost; else state.aiInvested += cost;
+  if (p.chips < cost) { setMsg((id === "me" ? "你" : p.name) + "筹码不足，无法加注"); return false; }
+  p.chips -= cost; p.invested += cost; state.pot += cost;
   state.callAmount = newCall;
-  localRecordBet(player, cost);
+  localRecordBet(id, cost);
   return true;
 }
-function localEndRound(winner) {
+function localEndRound(winnerId) {
   state.phase = "showdown";
   state.current = null;
-  const w = state[winner];
-  const other = winner === "me" ? "ai" : "me";
+  const w = localPlayer(winnerId);
   w.chips += state.pot;
-  state.winner = winner;
+  state.winner = winnerId;
   renderLocal();
-  // 积分结算
+  // 积分结算：按实际投入积分计算
   const winPts = Math.max(1, Math.round(state.pot / state.stake));
-  const losePts = Math.max(1, Math.round(state[other].chips >= 0 ? (state[other].chips === 0 ? 0 : 0) : 0));
-  const loserInvested = state[other].invested === undefined ? 0 : state[other].invested;
-  const loseAmt = Math.max(1, Math.round((state[other] === state.me ? state.meInvested : state.aiInvested) / state.stake));
-  const lb = addLocalGame(winner === "me", winner === "me" ? winPts : -loseAmt);
-  const myPts = winner === "me" ? winPts : -loseAmt;
-  showLocalModal(winner, myPts, lb);
+  const loseAmt = Math.max(1, Math.round(state.me.invested / state.stake));
+  const myPts = winnerId === "me" ? winPts : -loseAmt;
+  const lb = addLocalGame(winnerId === "me", myPts);
+  showLocalModal(winnerId, myPts, lb);
 }
-function localDoFold(player) {
-  state[player].folded = true;
-  localEndRound(player === "me" ? "ai" : "me");
+function localDoFold(id) {
+  const p = localPlayer(id);
+  p.folded = true;
+  const alive = localAlive();
+  if (alive.length <= 1) { localEndRound(alive[0]); return; }
+  localNextTurn();
 }
-function localDoCompare(player) {
-  const p = state[player];
-  const fee = state[player].looked ? state.callAmount : Math.max(1, Math.ceil(state.callAmount / 2));
-  if (p.chips < fee) { setMsg("筹码不足，无法比牌"); return false; }
-  p.chips -= fee; state.pot += fee;
-  if (player === "me") state.meInvested += fee; else state.aiInvested += fee;
-  localRecordBet(player, fee);
-  const result = compareHands(state.me.hand, state.me.cards, state.ai.hand, state.ai.cards);
-  const loser = result >= 0 ? "ai" : "me";
-  state[loser].folded = true;
-  localEndRound(result >= 0 ? "me" : "ai");
+function localDoCompare(id, targetId) {
+  const p = localPlayer(id);
+  const tp = localPlayer(targetId);
+  const fee = costFor(id);
+  if (p.chips < fee) { setMsg((id === "me" ? "你" : p.name) + "筹码不足，无法比牌"); return false; }
+  p.chips -= fee; p.invested += fee; state.pot += fee;
+  localRecordBet(id, fee);
+  const result = compareHands(p.hand, p.cards, tp.hand, tp.cards);
+  const loserId = result >= 0 ? targetId : id;
+  localPlayer(loserId).folded = true;
+  setMsg(result >= 0 ? p.name + " 比牌胜出，" + tp.name + " 落败" : tp.name + " 比牌胜出，" + p.name + " 落败");
+  renderLocal();
+  const alive = localAlive();
+  if (alive.length <= 1) { localEndRound(alive[0]); return; }
+  localNextTurn();
   return true;
 }
+/* 推进到下一个未弃牌玩家；若是 AI 则触发其思考 */
+function localNextTurn() {
+  if (state.phase !== "betting") return;
+  const curIdx = localSeats().indexOf(state.current);
+  const idx = localNextFrom(curIdx);
+  if (idx < 0) { const alive = localAlive(); if (alive.length === 1) localEndRound(alive[0]); return; }
+  state.current = localSeats()[idx];
+  $("round-info").textContent = `第 ${state.round} 局 ｜ 底注 ${state.stake} ｜ 当前注 ${state.callAmount}`;
+  renderLocal();
+  if (state.current !== "me") aiAct(state.current);
+  else setMsg("轮到你了。");
+}
 function showLocalModal(winner, myPts, lb) {
-  $("modal-title").textContent = winner === "me" ? "🎉 你赢了！" : "😔 电脑赢了";
+  const wName = winner === "me" ? "你" : localPlayer(winner).name;
+  const wCards = localPlayer(winner).cards;
+  const wHand = localPlayer(winner).hand;
+  const meCards = state.me.cards;
+  const meHand = state.me.hand;
+  $("modal-title").textContent = winner === "me" ? "🎉 你赢了！" : "😔 " + wName + " 赢了";
   $("modal-sub").textContent = winner === "me" ? "赢得本局底池" : "再接再厉，下一局翻盘";
   $("modal-cards").innerHTML =
-    `<div class="result-player"><div class="rp-name">我：${state.me.hand.name}</div><div style="display:flex;gap:6px;justify-content:center;">${state.me.cards.map(c => cardHTML(c, true)).join("")}</div></div>` +
-    `<div class="result-player"><div class="rp-name">电脑：${state.ai.hand.name}</div><div style="display:flex;gap:6px;justify-content:center;">${state.ai.cards.map(c => cardHTML(c, true)).join("")}</div></div>`;
-  $("modal-hand").textContent = "牌型：" + (winner === "me" ? state.me.hand.name : state.ai.hand.name);
+    `<div class="result-player"><div class="rp-name">我：${meHand ? meHand.name : "—"}</div><div style="display:flex;gap:6px;justify-content:center;">${meCards.map(c => cardHTML(c, true)).join("")}</div></div>` +
+    `<div class="result-player"><div class="rp-name">${wName}：${wHand ? wHand.name : "—"}</div><div style="display:flex;gap:6px;justify-content:center;">${wCards.map(c => cardHTML(c, true)).join("")}</div></div>`;
+  $("modal-hand").textContent = "牌型：" + (wHand ? wHand.name : "—");
   $("modal-amt").textContent = "+" + state.pot + " 筹码";
   $("modal-score").innerHTML = myPts >= 0 ? `积分 <span style="color:#7dff9b">+${myPts}</span> · 总分 ${lb.score}` : `积分 <span style="color:#ff8a8a">${myPts}</span> · 总分 ${lb.score}`;
   state.round++;
   $("modal").classList.add("show");
 }
 
-function aiTurn() {
-  if (state.phase !== "betting" || state.current !== "ai" || state.ai.folded || state.lock) return;
+function aiAct(id) {
+  if (state.phase !== "betting" || state.current !== id || state.lock) return;
+  const ai = localPlayer(id);
+  if (ai.folded) return;
   state.lock = true;
-  $("ai-think").textContent = "电脑思考中…";
-  setTimeout(() => { state.lock = false; aiDecide(); renderLocal(); }, 600 + Math.random() * 700);
+  setTimeout(() => { state.lock = false; aiDecide(id); renderLocal(); }, 500 + Math.random() * 600);
 }
 function handScore(hand) {
   const base = { leopard: 0.97, straightflush: 0.9, flush: 0.78, straight: 0.72, pair: 0.5, high: 0.22 };
@@ -646,32 +657,40 @@ function handScore(hand) {
   if (hand.type === "pair") s += (hand.rank[1] - 1) / 13 * 0.2;
   return Math.min(1, s);
 }
-function aiDecide() {
-  const ai = state.ai;
+/* 每个AI独立决策：各自手牌强度判断看牌/跟注/加注/比牌/弃牌，风格各异 */
+function aiDecide(id) {
+  const ai = localPlayer(id);
   const score = handScore(ai.hand);
+  const aggress = [0.68, 0.38, 0.52, 0.46][parseInt(id.slice(2), 10)] || 0.5; // 小刚激进/小红保守/小强均衡/小美稳健
+  const name = ai.name;
   let done = false;
+  if (state.phase !== "betting") return;
   if (!ai.looked) {
-    if (Math.random() < 0.45) { ai.looked = true; ai.vision = "已看牌"; $("ai-think").textContent = "电脑看牌了！"; }
-    else { localDoCall("ai"); $("ai-think").textContent = "电脑跟注（未看牌）"; }
+    if (Math.random() < 0.55) { ai.looked = true; setMsg(name + " 看牌了"); }
+    else if (Math.random() < 0.5 + aggress * 0.2) { const ok = localDoCall(id); if (ok) setMsg(name + " 暗牌跟注 " + state.lastActorBet); }
+    else { const ok = localDoRaise(id); if (ok) setMsg(name + " 暗牌加注至 " + state.callAmount); }
   } else {
-    if (score > 0.85) { localDoRaise("ai"); $("ai-think").textContent = "电脑加注！"; }
-    else if (score > 0.55) { if (Math.random() < 0.6) { localDoRaise("ai"); $("ai-think").textContent = "电脑加注施压"; } else { localDoCall("ai"); $("ai-think").textContent = "电脑跟注"; } }
-    else if (score > 0.28) { if (Math.random() < 0.3) { localDoCompare("ai"); $("ai-think").textContent = "电脑比牌"; done = true; } else { localDoCall("ai"); $("ai-think").textContent = "电脑跟注"; } }
-    else { if (Math.random() < 0.55) { localDoCompare("ai"); $("ai-think").textContent = "电脑比牌试探"; done = true; } else { localDoFold("ai"); done = true; } }
+    if (score > 0.85) { const ok = localDoRaise(id); if (ok) setMsg(name + " 加注至 " + state.callAmount + "（牌很强）"); }
+    else if (score > 0.55) { if (Math.random() < 0.45 + aggress * 0.3) { const ok = localDoRaise(id); if (ok) setMsg(name + " 加注施压至 " + state.callAmount); } else { const ok = localDoCall(id); if (ok) setMsg(name + " 跟注"); } }
+    else if (score > 0.28) { if (Math.random() < 0.25 + aggress * 0.15) { if (localDoCompare(id, compareTarget(id))) done = true; } else { const ok = localDoCall(id); if (ok) setMsg(name + " 跟注"); } }
+    else { if (Math.random() < 0.5 + aggress * 0.1) { if (localDoCompare(id, compareTarget(id))) done = true; } else { localDoFold(id); done = true; setMsg(name + " 弃牌"); } }
   }
-  if (state.phase === "betting" && !done) {
-    state.current = "me";
-    $("round-info").textContent = `第 ${state.round} 局 ｜ 底注 ${state.stake} ｜ 当前注 ${state.callAmount}`;
-    setMsg("轮到你了。");
-  }
+  if (state.phase === "betting" && !done) localNextTurn();
+}
+function compareTarget(id) {
+  const alive = localAlive().filter(x => x !== id);
+  const scores = alive.map(x => handScore(localPlayer(x).hand));
+  let minIdx = 0;
+  for (let i = 1; i < scores.length; i++) if (scores[i] < scores[minIdx]) minIdx = i;
+  return alive[minIdx];
 }
 
 /* ========== 人机事件 ========== */
 $("btn-start").addEventListener("click", () => { $("modal").classList.remove("show"); startLocalRound(); });
-$("btn-look").addEventListener("click", () => { if (state.phase !== "betting" || state.current !== "me") return; state.me.looked = true; setMsg("你已看牌：" + state.me.hand.name); renderLocal(); aiTurn(); });
-$("btn-call").addEventListener("click", () => { if (state.phase !== "betting" || state.current !== "me") return; const ok = localDoCall("me"); if (!ok) return; setMsg("你跟注了"); renderLocal(); aiTurn(); });
-$("btn-raise").addEventListener("click", () => { if (state.phase !== "betting" || state.current !== "me") return; const ok = localDoRaise("me"); if (!ok) return; setMsg("你加注了！当前注 " + state.callAmount); renderLocal(); aiTurn(); });
-$("btn-compare").addEventListener("click", () => { if (state.phase !== "betting" || state.current !== "me") return; localDoCompare("me"); });
+$("btn-look").addEventListener("click", () => { if (state.phase !== "betting" || state.current !== "me") return; state.me.looked = true; setMsg("你已看牌：" + state.me.hand.name); renderLocal(); localNextTurn(); });
+$("btn-call").addEventListener("click", () => { if (state.phase !== "betting" || state.current !== "me") return; const ok = localDoCall("me"); if (!ok) return; setMsg("你跟注 " + state.lastActorBet); renderLocal(); localNextTurn(); });
+$("btn-raise").addEventListener("click", () => { if (state.phase !== "betting" || state.current !== "me") return; const ok = localDoRaise("me"); if (!ok) return; setMsg("你加注了！当前注 " + state.callAmount); renderLocal(); localNextTurn(); });
+$("btn-compare").addEventListener("click", () => { if (state.phase !== "betting" || state.current !== "me") return; localDoCompare("me", compareTarget("me")); });
 $("btn-fold").addEventListener("click", () => { if (state.phase !== "betting" || state.current !== "me") return; localDoFold("me"); });
 $("modal-continue").addEventListener("click", () => { $("modal").classList.remove("show"); startLocalRound(); });
 $("modal-close").addEventListener("click", () => $("modal").classList.remove("show"));
