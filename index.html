@@ -187,6 +187,10 @@ body {
     <div class="menu-inner">
       <div class="logo">🃏 炸金花</div>
       <div class="menu-sub">2-10 人在线联机 · 自定义房间码 · 赢家轮庄 · 暗拍跟注 · 积分累积</div>
+      <div style="display:flex;gap:8px;justify-content:center;margin:6px 0 4px;max-width:320px;margin-left:auto;margin-right:auto;">
+        <input id="player-name-input" placeholder="你的昵称（默认随机动漫名）" maxlength="12" autocomplete="off" style="flex:1;min-width:0;background:rgba(255,255,255,.08);border:1px solid #3d5a47;border-radius:10px;color:#eaf5ee;padding:8px 10px;font-size:14px;text-align:center;">
+        <button class="btn small" id="player-name-random" type="button" style="padding:8px 12px;">🎲 换一个</button>
+      </div>
       <button class="menu-btn primary" id="menu-local">🤖 人机对战</button>
       <button class="menu-btn online" id="menu-online">🌐 联机对战</button>
       <button class="menu-btn score" id="menu-score">🏆 积分榜</button>
@@ -227,7 +231,7 @@ body {
       <button class="btn small" id="local-bet-2x">翻倍 2</button>
       <span style="font-size:11px;color:#8fae99;" id="local-bet-hint"></span>
     </div>
-    <div class="hint">人机5人局：你 + 4名AI对手（小刚/小红/小强/小美）｜ 豹子 &gt; 同花顺 &gt; 金花 &gt; 顺子 &gt; 对子 &gt; 单张 ｜ 235 吃豹子<br>开局每人押 1 底注 ｜ 上家暗牌押 X，下家跟注翻倍为 2X（暗牌跟注同样 2X）｜ 跟注 1 起步、加注 2 以上、金额自选 ｜ 每人 500 筹码 ｜ 赢家下局末位行动</div>
+    <div class="hint">人机5人局：你 + 4名AI对手（小刚/小红/小强/小美）｜ 豹子 &gt; 同花顺 &gt; 金花 &gt; 顺子 &gt; 对子 &gt; 单张 ｜ 235 吃豹子<br>开局每人押 1 底注 ｜ 暗牌押 X 后，后续所有玩家跟注最低恒为 2X（不逐家递增）｜ 跟注 1 起步、加注 2 以上、金额自选 ｜ 积分制 0 起步、赢家通吃 ｜ 赢家下局末位行动</div>
   </div>
 
   <!-- 联机对战 -->
@@ -254,7 +258,7 @@ body {
         <input id="ol-code-input" placeholder="房间码（4-8位）" maxlength="8" autocomplete="off">
         <button class="btn" id="ol-join">加入房间</button>
       </div>
-      <div class="hint">开局每人押 1 底注 ｜ 上家暗牌押 X，下家跟注翻倍为 2X（暗牌跟注同样 2X）｜ 跟注 1 起步、加注 2 以上、金额自选 ｜ 每人 500 筹码 ｜ 每局赢家下局末位行动（轮庄）</div>
+      <div class="hint">开局每人押 1 底注 ｜ 暗牌押 X 后，后续所有玩家跟注最低恒为 2X（不逐家递增）｜ 跟注 1 起步、加注 2 以上、金额自选 ｜ 积分制 0 起步、赢家通吃 ｜ 每局赢家下局末位行动（轮庄）</div>
     </div>
     <!-- 房间（等待+游戏） -->
     <div id="ol-room" style="display:none;">
@@ -306,6 +310,7 @@ body {
     <div class="hand-name" id="modal-hand"></div>
     <div class="win-amt" id="modal-amt"></div>
     <div class="score-change" id="modal-score"></div>
+    <div class="sub" id="modal-countdown" style="color:#ffd77a;min-height:20px;"></div>
     <div class="btn-row">
       <button class="btn primary" id="modal-continue">下一局</button>
       <button class="btn" id="modal-close">关闭</button>
@@ -321,6 +326,7 @@ body {
     <div class="result-cards" id="ol-modal-cards"></div>
     <div class="win-amt" id="ol-modal-amt"></div>
     <div class="score-change" id="ol-modal-score"></div>
+    <div class="sub" id="ol-modal-countdown" style="color:#ffd77a;min-height:20px;"></div>
     <div class="btn-row" id="ol-modal-btns">
       <button class="btn primary" id="ol-modal-next">下一局</button>
       <button class="btn" id="ol-modal-close">关闭</button>
@@ -511,13 +517,44 @@ function cardHTML(card, faceUp, sm) {
 /* =====================================================================
  * 人机对战模式
  * ===================================================================== */
-const AI_NAMES = ["小刚", "小红", "小强", "小美"];
+/* =====================================================================
+ * 动漫昵称池：玩家默认随机动漫角色名，AI 也从池中随机分配（避免重名）
+ * ===================================================================== */
+const ANIME_NAMES = ["路飞","索隆","山治","娜美","罗宾","鸣人","佐助","小樱","卡卡西","柯南","毛利兰","灰原哀","怪盗基德","哆啦A梦","大雄","静香","胖虎","皮卡丘","小智","初音未来","樱木花道","流川枫","三井寿","赤木刚宪","犬夜叉","杀生丸","悟空","贝吉塔","鲁鲁修","桐人","亚丝娜","艾伦","三笠","兵长","坂田银时","神乐","夏目贵志","猫咪老师","埼玉","千寻","龙猫","波妞","艾莎","海绵宝宝","阿笠博士","服部平次"];
+const NAME_KEY = "zzjh_player_name";
+function randomAnimeName(exclude) {
+  const pool = ANIME_NAMES.filter(n => !(exclude || []).includes(n));
+  return pool[Math.floor(Math.random() * pool.length)] || ("玩家" + Math.floor(Math.random() * 900 + 100));
+}
+function loadPlayerName() {
+  try { const n = (localStorage.getItem(NAME_KEY) || "").trim(); if (n) return n; } catch (e) {}
+  return randomAnimeName([]);
+}
+function savePlayerName(n) { try { localStorage.setItem(NAME_KEY, n); } catch (e) {} }
+function freshAiNames(playerName) {
+  const used = playerName ? [playerName] : [];
+  const pool = ANIME_NAMES.slice();
+  for (let i = 0; i < pool.length; i++) { const j = i + Math.floor(Math.random() * (pool.length - i)); const t = pool[i]; pool[i] = pool[j]; pool[j] = t; }
+  const names = [];
+  for (const n of pool) { if (!used.includes(n)) { names.push(n); used.push(n); if (names.length >= 4) break; } }
+  while (names.length < 4) names.push("AI对手" + (names.length + 1));
+  return names;
+}
+function applyPlayerName() {
+  const inp = $("player-name-input");
+  const n = (inp.value || "").trim() || loadPlayerName();
+  state.me.name = n;
+  ol.myName = n;
+  savePlayerName(n);
+  try { const lb = loadLocalBoard(); if (lb.name !== n) { lb.name = n; saveLocalBoard(lb); } } catch (e) {}
+  return n;
+}
 const state = {
   phase: "idle", deck: [],
-  me: { id: "me", name: "我", cards: [], hand: null, chips: 500, folded: false, looked: false, invested: 0 },
-  ais: AI_NAMES.map((n, i) => ({ id: "ai" + i, name: n, cards: [], hand: null, chips: 500, folded: false, looked: false, invested: 0 })),
-  pot: 0, stake: 1, round: 1, current: "me", callAmount: 1,
-  winner: null, lock: false,
+  me: { id: "me", name: loadPlayerName(), cards: [], hand: null, chips: 0, folded: false, looked: false, invested: 0, bet: 0, allIn: false },
+  ais: freshAiNames(loadPlayerName()).map((n, i) => ({ id: "ai" + i, name: n, cards: [], hand: null, chips: 0, folded: false, looked: false, invested: 0, bet: 0, allIn: false })),
+  pot: 0, stake: 1, round: 1, current: "me", callAmount: 1, maxBet: 1,
+  winner: null, lock: false, nextTimer: null,
   lastActorDark: false, lastActorBet: 1,
   firstRoundOver: false, roundStarter: "me", actedSet: {}
 };
@@ -529,11 +566,12 @@ function localNextFrom(startIdx) {
   const seats = localSeats();
   for (let k = 1; k <= seats.length; k++) {
     const idx = (startIdx + k) % seats.length;
-    if (!localPlayer(seats[idx]).folded) return idx;
+    const p = localPlayer(seats[idx]);
+    if (!p.folded && !p.allIn) return idx;
   }
   return -1;
 }
-function localRecordBet(id, newCall) { const p = localPlayer(id); state.lastActorDark = p.looked; state.lastActorBet = newCall; }
+function localRecordBet(id, newBet) { const p = localPlayer(id); if (p) p.bet = newBet; }
 
 function renderLocal() {
   const wrap = $("local-players");
@@ -579,7 +617,7 @@ function renderLocalActions() {
   $("btn-look").textContent = "看牌";
   const myCost = costFor("me");
   $("btn-call").textContent = looked ? ("看牌跟注 " + myCost) : ("暗牌跟注 " + myCost);
-  $("btn-raise").textContent = "加注 至 " + minRaiseCall();
+  $("btn-raise").textContent = "加注 至 " + minRaiseCall("me");
   $("btn-compare").textContent = state.firstRoundOver ? ("比牌 " + myCost) : "第一轮不能比牌";
   $("btn-fold").textContent = "弃牌";
   $("btn-start").textContent = "开始新一局";
@@ -601,13 +639,14 @@ function renderLocalActions() {
 }
 
 function setMsg(t, small) { $("msg").textContent = t; $("msg").className = "msg" + (small ? " small" : ""); }
-/* 跟注金额：上家暗牌押 X → 下家跟注翻倍为 2X（看牌/暗牌一致）；上家明牌沿用当前注 */
-function costFor(id) {
-  if (state.lastActorDark) return 2 * state.lastActorBet;
-  return state.callAmount;
+/* 跟注金额：锁定值 callAmount。暗牌玩家下注/加注到 X 时 callAmount=2X（恒定翻倍一次），明牌下注/加注到 Z 时 callAmount=Z；正常跟注不改变锁定值 */
+function costFor(id) { return state.callAmount; }
+/* 加注最小目标注：明牌至少比当前门槛高1；暗牌需使翻倍后门槛提高且高于当前最高实际注额与本人水平 */
+function minRaiseCall(id) {
+  const p = localPlayer(id);
+  if (p.looked) return Math.max(2, state.callAmount + 1);
+  return Math.max(2, Math.max(p.bet, state.maxBet) + 1, Math.floor(state.callAmount / 2) + 1);
 }
-/* 加注最小目标注：至少比当前注高 1，且不低于 2 */
-function minRaiseCall() { return Math.max(2, state.callAmount + 1); }
 
 function startLocalRound() {
   if (state.lock) return;
@@ -615,8 +654,8 @@ function startLocalRound() {
   state.phase = "betting";
   state.deck = shuffle(makeDeck());
   // 重开新局：筹码跨局累积（不重置），仅清空手牌与局内状态
-  localSeats().forEach(id => { const p = localPlayer(id); p.cards = []; p.hand = null; p.folded = false; p.looked = false; p.invested = 0; });
-  state.pot = 0; state.callAmount = 1;
+  localSeats().forEach(id => { const p = localPlayer(id); p.cards = []; p.hand = null; p.folded = false; p.looked = false; p.invested = 0; p.bet = 0; });
+  state.pot = 0; state.callAmount = 1; state.maxBet = 1;
   state.firstRoundOver = false; state.actedSet = {}; state.comparePending = null;
   const prevWinner = state.winner;
   state.winner = null;
@@ -627,6 +666,7 @@ function startLocalRound() {
     p.hand = evaluateHand(p.cards);
     const fee = Math.min(1, p.chips);
     p.chips -= fee; p.invested += fee; state.pot += fee;
+    p.bet = fee;
   });
   // 赢家轮庄：上局赢家本局末位行动，其余按座位顺序依次行动（首行动者=赢家的下一位）
   let startIdx = 0; let prevName = "";
@@ -644,25 +684,53 @@ function startLocalRound() {
   if (state.current !== "me") aiAct(state.current);
 }
 
+function localAllIn(id) {
+  const p = localPlayer(id);
+  if (p.chips <= 0) return false;
+  const amt = p.chips;
+  p.chips = 0; p.invested += amt; state.pot += amt; p.bet += amt; p.allIn = true;
+  localRecordBet(id, p.bet);
+  setMsg((id === "me" ? "你" : p.name) + " 全押 " + amt);
+  return true;
+}
 function localDoCall(id, amt) {
   const p = localPlayer(id);
   const min = costFor(id);
   if (amt === undefined || amt === null || isNaN(amt)) amt = min;
   amt = Math.max(min, Math.floor(amt));
-  if (p.chips < min) { setMsg((id === "me" ? "你" : p.name) + "筹码不足，无法跟注"); return false; }
+  if (p.chips <= 0) {
+    // 积分为零：无法跟注，自动弃牌（避免无休止空转）
+    p.folded = true;
+    setMsg((id === "me" ? "你" : p.name) + " 积分为零，自动弃牌");
+    const alive = localAlive();
+    if (alive.length <= 1) { localEndRound(alive[0]); }
+    return true;
+  }
+  if (p.chips < min) { return localAllIn(id); }
   amt = Math.min(amt, p.chips);
   p.chips -= amt; p.invested += amt; state.pot += amt;
-  state.callAmount = amt;
+  p.bet = amt;
+  // 正常跟注（amt==锁定值）不改变 callAmount；超额跟注视为变相加注，按明暗更新锁定值与最高实际注额
+  if (amt > state.callAmount) {
+    state.callAmount = p.looked ? amt : 2 * amt;
+    state.maxBet = Math.max(state.maxBet, amt);
+  }
   localRecordBet(id, amt);
   return true;
 }
 function localDoRaise(id, newCall) {
   const p = localPlayer(id);
-  const target = Math.max(minRaiseCall(), Math.floor(newCall === undefined || isNaN(newCall) ? state.callAmount * 2 : newCall));
-  const cost = target - state.callAmount;
-  if (p.chips < cost) { setMsg((id === "me" ? "你" : p.name) + "筹码不足，无法加注"); return false; }
+  const target = Math.max(minRaiseCall(id), Math.floor(newCall === undefined || isNaN(newCall) ? state.callAmount * 2 : newCall));
+  const cost = target - p.bet;
+  if (p.chips < cost) {
+    if (p.chips <= 0) { setMsg((id === "me" ? "你" : p.name) + "积分为零，无法加注"); return false; }
+    return localAllIn(id);
+  }
   p.chips -= cost; p.invested += cost; state.pot += cost;
-  state.callAmount = target;
+  // 暗牌加注到 X → 锁定值 2X（恒定翻倍一次）；明牌加注到 Z → 锁定值 Z
+  state.callAmount = p.looked ? target : 2 * target;
+  state.maxBet = Math.max(state.maxBet, target);
+  p.bet = target;
   localRecordBet(id, target);
   return true;
 }
@@ -673,10 +741,8 @@ function localEndRound(winnerId) {
   w.chips += state.pot;
   state.winner = winnerId;
   renderLocal();
-  // 积分结算：按实际投入积分计算
-  const winPts = Math.max(1, Math.round(state.pot / state.stake));
-  const loseAmt = Math.max(1, Math.round(state.me.invested / state.stake));
-  const myPts = winnerId === "me" ? winPts : -loseAmt;
+  // 积分制结算：赢家积分 += 奖池总额；输家积分 -= 本局实际投入（可为负）
+  const myPts = winnerId === "me" ? state.pot : -state.me.invested;
   const lb = addLocalGame(winnerId === "me", myPts);
   showLocalModal(winnerId, myPts, lb);
 }
@@ -691,7 +757,7 @@ function localDoCompare(id, targetId) {
   const p = localPlayer(id);
   const tp = localPlayer(targetId);
   const fee = costFor(id);
-  if (p.chips < fee) { setMsg((id === "me" ? "你" : p.name) + "筹码不足，无法比牌"); return false; }
+  if (p.chips < fee) { setMsg((id === "me" ? "你" : p.name) + "积分不足，无法比牌"); return false; }
   p.chips -= fee; p.invested += fee; state.pot += fee;
   localRecordBet(id, fee);
   const result = compareHands(p.hand, p.cards, tp.hand, tp.cards);
@@ -715,12 +781,22 @@ function localNextTurn() {
   }
   const curIdx = localSeats().indexOf(state.current);
   const idx = localNextFrom(curIdx);
-  if (idx < 0) { const alive = localAlive(); if (alive.length === 1) localEndRound(alive[0]); return; }
+  if (idx < 0) {
+    const alive = localAlive();
+    if (alive.length === 1) { localEndRound(alive[0]); return; }
+    // 所有剩余玩家全押或无对手可行动，自动亮牌比大小
+    const best = alive.reduce((a, b) => compareHands(localPlayer(a).hand, localPlayer(a).cards, localPlayer(b).hand, localPlayer(b).cards) >= 0 ? a : b);
+    localEndRound(best);
+    return;
+  }
   state.current = localSeats()[idx];
   $("round-info").textContent = `第 ${state.round} 局 ｜ 底注 1 ｜ 当前注 ${state.callAmount}`;
   renderLocal();
   if (state.current !== "me") aiAct(state.current);
   else setMsg("轮到你了。");
+}
+function clearLocalAutoNext() {
+  if (state.nextTimer) { clearTimeout(state.nextTimer); state.nextTimer = null; }
 }
 function showLocalModal(winner, myPts, lb) {
   const wName = winner === "me" ? "你" : localPlayer(winner).name;
@@ -729,15 +805,19 @@ function showLocalModal(winner, myPts, lb) {
   const meCards = state.me.cards;
   const meHand = state.me.hand;
   $("modal-title").textContent = winner === "me" ? "🎉 你赢了！" : "😔 " + wName + " 赢了";
-  $("modal-sub").textContent = winner === "me" ? "赢得奖池全部筹码" : "再接再厉，下一局翻盘";
+  $("modal-sub").textContent = winner === "me" ? "赢得奖池全部积分" : "再接再厉，下一局翻盘";
   $("modal-cards").innerHTML =
     `<div class="result-player"><div class="rp-name">我：${meHand ? meHand.name : "—"}</div><div style="display:flex;gap:6px;justify-content:center;">${meCards.map(c => cardHTML(c, true)).join("")}</div></div>` +
     `<div class="result-player"><div class="rp-name">${wName}：${wHand ? wHand.name : "—"}</div><div style="display:flex;gap:6px;justify-content:center;">${wCards.map(c => cardHTML(c, true)).join("")}</div></div>`;
   $("modal-hand").textContent = "牌型：" + (wHand ? wHand.name : "—");
-  $("modal-amt").textContent = "赢得奖池 +" + state.pot + " 筹码";
+  $("modal-amt").textContent = "赢得奖池 +" + state.pot + " 积分";
   $("modal-score").innerHTML = myPts >= 0 ? `积分 <span style="color:#7dff9b">+${myPts}</span> · 总分 ${lb.score}` : `积分 <span style="color:#ff8a8a">${myPts}</span> · 总分 ${lb.score}`;
   state.round++;
   $("modal").classList.add("show");
+  // 自动下一把：结算后立刻自动开始下一局，无倒计时等待；弹窗保留展示结果，点「下一局」/「关闭」进入新局
+  clearLocalAutoNext();
+  $("modal-countdown").textContent = "新一局已自动开始，点击「下一局」进入";
+  if (state.phase !== "betting") startLocalRound();
 }
 
 function aiAct(id) {
@@ -768,16 +848,16 @@ function aiDecide(id) {
       // 看牌后必须行动：继续跟注或加注，不允许跳过
       const s2 = handScore(ai.hand);
       if (s2 > 0.6) { const ok = localDoRaise(id); if (ok) setMsg(name + " 看牌后加注至 " + state.callAmount); }
-      else { const ok = localDoCall(id); if (ok) setMsg(name + " 看牌后跟注"); }
+      else { const ok = localDoCall(id); if (ok && !ai.folded) setMsg(name + " 看牌后跟注"); }
       localNextTurn();
       return;
     }
-    else if (Math.random() < 0.5 + aggress * 0.2) { const ok = localDoCall(id); if (ok) setMsg(name + " 暗牌跟注 " + state.lastActorBet); }
-    else { const ok = localDoRaise(id); if (ok) setMsg(name + " 暗牌加注至 " + state.callAmount); }
+    else if (Math.random() < 0.5 + aggress * 0.2) { const ok = localDoCall(id); if (ok && !ai.folded) setMsg(name + " 暗牌跟注 " + costFor(id)); }
+    else { const ok = localDoRaise(id); if (ok) setMsg(name + " 暗牌加注至 " + state.callAmount + "（暗牌翻倍）"); }
   } else {
     if (score > 0.85) { const ok = localDoRaise(id); if (ok) setMsg(name + " 加注至 " + state.callAmount + "（牌很强）"); }
-    else if (score > 0.55) { if (Math.random() < 0.45 + aggress * 0.3) { const ok = localDoRaise(id); if (ok) setMsg(name + " 加注施压至 " + state.callAmount); } else { const ok = localDoCall(id); if (ok) setMsg(name + " 跟注"); } }
-    else if (score > 0.28) { if (state.firstRoundOver && Math.random() < 0.25 + aggress * 0.15) { if (localDoCompare(id, compareTarget(id))) done = true; } else { const ok = localDoCall(id); if (ok) setMsg(name + " 跟注"); } }
+    else if (score > 0.55) { if (Math.random() < 0.45 + aggress * 0.3) { const ok = localDoRaise(id); if (ok) setMsg(name + " 加注施压至 " + state.callAmount); } else { const ok = localDoCall(id); if (ok && !ai.folded) setMsg(name + " 跟注"); } }
+    else if (score > 0.28) { if (state.firstRoundOver && Math.random() < 0.25 + aggress * 0.15) { if (localDoCompare(id, compareTarget(id))) done = true; } else { const ok = localDoCall(id); if (ok && !ai.folded) setMsg(name + " 跟注"); } }
     else { if (state.firstRoundOver && Math.random() < 0.5 + aggress * 0.1) { if (localDoCompare(id, compareTarget(id))) done = true; } else { localDoFold(id); done = true; setMsg(name + " 弃牌"); } }
   }
   if (state.phase === "betting" && !done) localNextTurn();
@@ -798,11 +878,11 @@ function localOpenCompare() {
   if (!state.firstRoundOver) { setMsg("第一轮不能比牌"); return; }
   const fee = costFor("me");
   const p = state.me;
-  if (p.chips < fee) { setMsg("筹码不足，无法比牌"); return; }
+  if (p.chips < fee) { setMsg("积分不足，无法比牌"); return; }
   // 先自动支付当前跟注金额，再弹出选择比牌对象
   p.chips -= fee; p.invested += fee; state.pot += fee;
   localRecordBet("me", fee);
-  localComparePending = { fee, invested: p.invested, lastActorDark: state.lastActorDark, lastActorBet: state.lastActorBet };
+  localComparePending = { fee, invested: p.invested, bet: p.bet, lastActorDark: state.lastActorDark, lastActorBet: state.lastActorBet };
   renderLocal();
   if (targets.length === 1) { localPickCompare(targets[0]); return; }
   $("compare-options").innerHTML = targets.map(t =>
@@ -832,6 +912,7 @@ function localCancelCompare() {
   p.chips += localComparePending.fee;
   p.invested = localComparePending.invested;
   state.pot -= localComparePending.fee;
+  p.bet = localComparePending.bet !== undefined ? localComparePending.bet : state.callAmount;
   state.lastActorDark = localComparePending.lastActorDark;
   state.lastActorBet = localComparePending.lastActorBet;
   localComparePending = null;
@@ -847,16 +928,16 @@ $("btn-call").addEventListener("click", () => {
   const min = costFor("me");
   let amt = parseInt($("local-bet-input").value, 10);
   if (isNaN(amt) || amt < min) { setMsg("跟注金额不能低于 " + min + "，已按最低跟注"); amt = min; }
-  if (amt > state.me.chips) { setMsg("筹码不足，已按剩余筹码 " + state.me.chips + " 跟注"); amt = state.me.chips; }
+  if (amt > state.me.chips) { setMsg("积分不足，已按剩余积分 " + state.me.chips + " 跟注"); amt = state.me.chips; }
   const ok = localDoCall("me", amt); if (!ok) return;
-  setMsg("你跟注 " + amt + (state.lastActorDark ? "（上家暗牌翻倍）" : ""));
+  if (!state.me.folded) setMsg("你跟注 " + amt);
   renderLocal(); localNextTurn();
 });
 $("btn-raise").addEventListener("click", () => {
   if (state.phase !== "betting" || state.current !== "me") return;
   let target = parseInt($("local-bet-input").value, 10);
-  if (isNaN(target) || target < minRaiseCall()) { setMsg("加注目标注不能低于 " + minRaiseCall() + "，已按默认加注"); target = minRaiseCall(); }
-  if (target - state.callAmount > state.me.chips) { setMsg("筹码不足，加注目标注最多 " + (state.callAmount + state.me.chips)); target = state.callAmount + state.me.chips; }
+  if (isNaN(target) || target < minRaiseCall("me")) { setMsg("加注目标注不能低于 " + minRaiseCall("me") + "，已按默认加注"); target = minRaiseCall("me"); }
+  if (target - state.me.bet > state.me.chips) { setMsg("积分不足，加注目标注最多 " + (state.me.bet + state.me.chips)); target = state.me.bet + state.me.chips; }
   const ok = localDoRaise("me", target); if (!ok) return;
   setMsg("你加注了！当前注 " + state.callAmount); renderLocal(); localNextTurn();
 });
@@ -865,14 +946,25 @@ $("btn-fold").addEventListener("click", () => { if (state.phase !== "betting" ||
 $("local-bet-input").addEventListener("input", () => { $("local-bet-input").dataset.touched = "1"; });
 $("local-bet-min").addEventListener("click", () => { $("local-bet-input").value = costFor("me"); $("local-bet-input").dataset.touched = "1"; });
 $("local-bet-2x").addEventListener("click", () => { const v = Math.min(costFor("me") * 2, state.me.chips); $("local-bet-input").value = v; $("local-bet-input").dataset.touched = "1"; });
-$("modal-continue").addEventListener("click", () => { $("modal").classList.remove("show"); startLocalRound(); });
-$("modal-close").addEventListener("click", () => $("modal").classList.remove("show"));
-$("local-back").addEventListener("click", () => { $("modal").classList.remove("show"); showScreen("screen-menu"); updateMenuStats(); });
+$("modal-continue").addEventListener("click", () => { clearLocalAutoNext(); $("modal").classList.remove("show"); if (state.phase !== "betting") startLocalRound(); });
+$("modal-close").addEventListener("click", () => { clearLocalAutoNext(); $("modal").classList.remove("show"); });
+$("local-back").addEventListener("click", () => { clearLocalAutoNext(); $("modal").classList.remove("show"); showScreen("screen-menu"); updateMenuStats(); });
 $("menu-local").addEventListener("click", () => {
   showScreen("screen-local");
-  // 从主菜单重新开始游戏：恢复初始 500 筹码
-  localSeats().forEach(id => { localPlayer(id).chips = 500; });
+  // 应用当前昵称并随机分配 AI 动漫名（避免与玩家重名）
+  applyPlayerName();
+  const aiNames = freshAiNames(state.me.name);
+  state.ais.forEach((ai, i) => { ai.name = aiNames[i]; });
+  // 从主菜单重新开始游戏：积分制 0 起步（历史战绩保留在积分榜）
+  localSeats().forEach(id => { localPlayer(id).chips = 0; });
   renderLocal();
+});
+/* 随机动漫名按钮：点击换一个 */
+$("player-name-random").addEventListener("click", () => {
+  const cur = $("player-name-input").value.trim();
+  const n = randomAnimeName(cur ? [cur] : []);
+  $("player-name-input").value = n;
+  savePlayerName(n);
 });
 
 /* =====================================================================
@@ -883,10 +975,10 @@ const CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 function genCode(len) { let s = ""; for (let i = 0; i < len; i++) s += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]; return s; }
 
 const ol = {
-  peer: null, conns: [], isHost: false, roomCode: "", myName: "玩家", mySeat: -1,
+  peer: null, conns: [], isHost: false, roomCode: "", myName: loadPlayerName(), mySeat: -1,
   players: [], cards: {}, myCards: [],
-  pot: 0, callAmount: 1, current: -1, phase: "lobby", round: 1, stake: 1,
-  lock: false, hostConn: null, heartTimer: null,
+  pot: 0, callAmount: 1, maxBet: 1, current: -1, phase: "lobby", round: 1, stake: 1,
+  lock: false, hostConn: null, heartTimer: null, nextTimer: null,
   lastActorDark: false, lastActorBet: 1,
   firstRoundOver: false, roundStarter: 0, actedSet: {}, comparePending: null
 };
@@ -894,28 +986,28 @@ const ol = {
 function olSeat(seat) { return ol.players.find(p => p.seat === seat); }
 function olAlive() { return ol.players.filter(p => !p.folded && !p.out); }
 function olActiveCount() { return olAlive().length; }
-/* 跟注金额：上家暗牌押 X → 下家跟注翻倍为 2X（看牌/暗牌一致）；上家明牌沿用当前注 */
-function olCostFor(p) {
-  if (ol.lastActorDark) return 2 * ol.lastActorBet;
-  return ol.callAmount;
+/* 跟注金额：锁定值 callAmount。暗牌玩家下注/加注到 X 时 callAmount=2X（恒定翻倍一次），明牌下注/加注到 Z 时 callAmount=Z；正常跟注不改变锁定值 */
+function olCostFor(p) { return ol.callAmount; }
+/* 加注最小目标注：明牌至少比当前门槛高1；暗牌需使翻倍后门槛提高且高于当前最高实际注额与本人水平 */
+function olMinRaiseFor(p) {
+  if (p.looked) return Math.max(2, ol.callAmount + 1);
+  return Math.max(2, Math.max(p.bet, ol.maxBet) + 1, Math.floor(ol.callAmount / 2) + 1);
 }
-/* 加注最小目标注：至少比当前注高 1，且不低于 2 */
-function olMinRaiseCall() { return Math.max(2, ol.callAmount + 1); }
-function olRecordBet(seat, newCall) {
+function olRecordBet(seat, newBet) {
   const p = ol.players[seat];
   if (!p) return;
-  ol.lastActorDark = p.looked; ol.lastActorBet = newCall;
+  p.bet = newBet;
 }
 
 function olBroadcast(obj, except) {
-  ol.conns.forEach(c => { if (c.open && c.peer !== except) { try { c.send(obj); } catch (e) {} } });
+  ol.conns.forEach(c => { if (c && c.open && c.peer !== except) { try { c.send(obj); } catch (e) {} } });
 }
 function olSendToHost(obj) { if (ol.hostConn && ol.hostConn.open) { try { ol.hostConn.send(obj); } catch (e) {} } }
 function olPublicState() {
   return {
     type: "state",
-    players: ol.players.map(p => ({ seat: p.seat, name: p.name, chips: p.chips, folded: p.folded, out: p.out, online: p.online, looked: p.looked, invested: p.invested })),
-    pot: ol.pot, callAmount: ol.callAmount, current: ol.current, phase: ol.phase,
+    players: ol.players.map(p => ({ seat: p.seat, name: p.name, chips: p.chips, folded: p.folded, out: p.out, online: p.online, looked: p.looked, invested: p.invested, bet: p.bet, allIn: p.allIn })),
+    pot: ol.pot, callAmount: ol.callAmount, maxBet: ol.maxBet, current: ol.current, phase: ol.phase,
     round: ol.round, stake: ol.stake, winner: ol.winner, lastAction: ol.lastAction,
     lastActorDark: ol.lastActorDark, lastActorBet: ol.lastActorBet,
     firstRoundOver: ol.firstRoundOver
@@ -925,6 +1017,7 @@ function olPublicState() {
 /* ---- 创建房间（支持自定义房间码） ---- */
 function createRoom(customCode) {
   cleanupOnline();
+  applyPlayerName();
   if (typeof Peer === "undefined") {
     toast("联机库加载失败（需联网）");
     showNetModal("联机功能需要联网加载 PeerJS，当前加载失败，无法创建房间。\n请检查网络后重试，或返回人机对战。");
@@ -951,7 +1044,7 @@ function createRoom(customCode) {
       ol.isHost = true;
       ol.roomCode = code;
       ol.peer = peer;
-      ol.players = [{ seat: 0, name: "玩家1", chips: 500, folded: false, out: false, online: true, looked: false, invested: 0 }];
+      ol.players = [{ seat: 0, name: ol.myName || loadPlayerName(), chips: 0, folded: false, out: false, online: true, looked: false, invested: 0, bet: 0, allIn: false }];
       ol.mySeat = 0;
       $("ol-lobby").style.display = "none";
       $("ol-room").style.display = "block";
@@ -1000,6 +1093,7 @@ function createRoom(customCode) {
 /* ---- 加入房间 ---- */
 function joinRoom() {
   cleanupOnline();
+  applyPlayerName();
   if (typeof Peer === "undefined") {
     toast("联机库加载失败（需联网）");
     showNetModal("联机功能需要联网加载 PeerJS，当前加载失败，无法加入房间。\n请检查网络后重试，或返回人机对战。");
@@ -1040,7 +1134,7 @@ function handleHostMessage(conn, data) {
     if (ol.phase !== "lobby") { conn.send({ type: "room_busy" }); try { conn.close(); } catch (e) {} return; }
     const seat = ol.players.length;
     if (seat >= MAX_PLAYERS) { conn.send({ type: "full" }); try { conn.close(); } catch (e) {} return; }
-    const p = { seat, name: data.name || ("玩家" + (seat + 1)), chips: 500, folded: false, out: false, online: true, looked: false, invested: 0 };
+    const p = { seat, name: data.name || ("玩家" + (seat + 1)), chips: 0, folded: false, out: false, online: true, looked: false, invested: 0, bet: 0, allIn: false };
     ol.players.push(p);
     ol.conns.push(conn);
     conn.send({ type: "welcome", mySeat: seat, code: ol.roomCode, players: ol.players.map(x => ({ seat: x.seat, name: x.name, online: true })), state: olPublicState() });
@@ -1058,12 +1152,14 @@ function handleHostLeave(conn) {
   const idx = ol.conns.indexOf(conn);
   if (idx >= 0) {
     const p = ol.players[idx + 1]; // conns[0] 对应 seat 1
-    ol.conns.splice(idx, 1);
+    ol.conns[idx] = null; // 置 null 而非 splice，保持 seat↔conn 映射不偏位
     if (p) {
-      p.online = false; p.out = true;
-      toast(p.name + " 掉线了");
+      p.online = false; p.out = true; p.folded = true;
+      toast(p.name + " 掉线了（已自动弃牌，游戏继续）");
       olBroadcast({ type: "left", seat: p.seat, name: p.name, players: ol.players.map(x => ({ seat: x.seat, name: x.name, online: x.online })) });
       checkAutoEnd();
+      // 若掉线玩家正处于行动回合，自动轮到下一家
+      if (ol.phase === "betting" && ol.current === p.seat) advanceTurn();
       renderOnlineRoom();
     }
   }
@@ -1087,22 +1183,54 @@ function handleHostAction(conn, data) {
     return;
   } else if (act === "call") {
     const min = olCostFor(p);
-    if (p.chips < min) { sendErr("筹码不足"); return; }
+    if (p.chips <= 0) {
+      // 积分为零：自动弃牌，游戏继续
+      p.folded = true;
+      ol.lastAction = p.name + " 积分为零，自动弃牌";
+      olBroadcast({ type: "folded", seat: p.seat });
+      checkAutoEnd();
+      if (ol.phase === "betting") advanceTurn();
+      return;
+    }
+    if (p.chips < min) {
+      // 积分不足以跟注：自动全押
+      const amt = p.chips; p.chips = 0; p.invested += amt; ol.pot += amt; p.bet += amt; p.allIn = true;
+      ol.lastAction = p.name + " 全押 " + amt;
+      olRecordBet(p.seat, p.bet);
+      advanceTurn();
+      return;
+    }
     let amt = parseInt(data.amount, 10);
     if (isNaN(amt) || amt < min) amt = min;
     amt = Math.min(amt, p.chips);
     p.chips -= amt; p.invested += amt; ol.pot += amt;
-    ol.callAmount = amt;
-    ol.lastAction = p.name + " 跟注 " + amt + (ol.lastActorDark ? "（翻倍）" : "");
+    p.bet = amt;
+    // 正常跟注（amt==锁定值）不改变 callAmount；超额跟注视为变相加注，按明暗更新锁定值与最高实际注额
+    if (amt > ol.callAmount) {
+      ol.callAmount = p.looked ? amt : 2 * amt;
+      ol.maxBet = Math.max(ol.maxBet, amt);
+    }
+    ol.lastAction = p.name + " 跟注 " + amt;
     olRecordBet(data.seat, amt);
     advanceTurn();
   } else if (act === "raise") {
-    const target = Math.max(olMinRaiseCall(), parseInt(data.newCall, 10) || ol.callAmount * 2);
-    const cost = target - ol.callAmount;
-    if (p.chips < cost) { sendErr("筹码不足"); return; }
+    const target = Math.max(olMinRaiseFor(p), parseInt(data.newCall, 10) || ol.callAmount * 2);
+    const cost = target - p.bet;
+    if (p.chips < cost) {
+      if (p.chips <= 0) { sendErr("积分为零，无法加注"); return; }
+      // 积分不足以加注：自动全押
+      const amt = p.chips; p.chips = 0; p.invested += amt; ol.pot += amt; p.bet += amt; p.allIn = true;
+      ol.lastAction = p.name + " 全押 " + amt;
+      olRecordBet(p.seat, p.bet);
+      advanceTurn();
+      return;
+    }
     p.chips -= cost; p.invested += cost; ol.pot += cost;
-    ol.callAmount = target;
-    ol.lastAction = p.name + " 加注至 " + target;
+    // 暗牌加注到 X → 锁定值 2X（恒定翻倍一次）；明牌加注到 Z → 锁定值 Z
+    ol.callAmount = p.looked ? target : 2 * target;
+    ol.maxBet = Math.max(ol.maxBet, target);
+    p.bet = target;
+    ol.lastAction = p.name + " 加注至 " + target + (p.looked ? "" : "（暗牌翻倍）");
     olRecordBet(data.seat, target);
     advanceTurn();
   } else if (act === "compare") {
@@ -1111,7 +1239,7 @@ function handleHostAction(conn, data) {
     const tp = ol.players[target];
     if (!tp || tp.folded || tp.out || !tp.online || target === p.seat) return;
     const fee = olCostFor(p);
-    if (p.chips < fee) { sendErr("筹码不足"); return; }
+    if (p.chips < fee) { sendErr("积分不足"); return; }
     p.chips -= fee; p.invested += fee; ol.pot += fee;
     olRecordBet(p.seat, fee);
     const ph = evaluateHand(ol.cards[p.seat]);
@@ -1137,7 +1265,10 @@ function handleHostAction(conn, data) {
 
 function advanceTurn() {
   const alive = olAlive();
-  if (alive.length <= 1) return;
+  if (alive.length <= 1) {
+    if (alive.length === 1 && ol.phase === "betting") showdown(alive[0].seat, alive[0].name);
+    return;
+  }
   // 记录刚完成行动的玩家；所有在场玩家都行动过一次后，第一轮结束（之后才允许比牌）
   if (!ol.actedSet[ol.current]) ol.actedSet[ol.current] = true;
   if (!ol.firstRoundOver && alive.every(p => ol.actedSet[p.seat])) ol.firstRoundOver = true;
@@ -1145,7 +1276,7 @@ function advanceTurn() {
   for (let i = 0; i < ol.players.length; i++) {
     next = (next + 1) % ol.players.length;
     const p = ol.players[next];
-    if (!p.folded && !p.out && p.online) break;
+    if (!p.folded && !p.out && p.online && !p.allIn) break;
   }
   ol.current = next;
   olBroadcast(olPublicState());
@@ -1171,9 +1302,9 @@ function hostStartGame() {
   ol.winner = null;
   ol.lastAction = "新一局开始";
   // 开局筹码沿用上局余额（跨局累积），不重置为 500
-  ol.players.forEach(p => { p.folded = false; p.out = false; p.looked = false; p.invested = 0; });
+  ol.players.forEach(p => { p.folded = false; p.looked = false; p.invested = 0; p.bet = 0; p.allIn = false; });
   ol.cards = {};
-  ol.pot = 0; ol.callAmount = 1; ol.current = 0;
+  ol.pot = 0; ol.callAmount = 1; ol.maxBet = 1; ol.current = 0;
   ol.lastActorDark = false; ol.lastActorBet = 1;
   ol.firstRoundOver = false; ol.actedSet = {}; ol.roundStarter = 0;
   deal();
@@ -1182,6 +1313,7 @@ function hostStartGame() {
 function deal() {
   const deck = shuffle(makeDeck());
   ol.players.forEach(p => {
+    if (!p.online || p.out) return; // 已离开/掉线玩家不参与发牌
     const cards = [deck.pop(), deck.pop(), deck.pop()];
     ol.cards[p.seat] = cards;
     if (p.seat === ol.mySeat) {
@@ -1193,10 +1325,12 @@ function deal() {
       }
     }
   });
-  // 底注
+  // 底注（仅在场玩家）
   ol.players.forEach(p => {
+    if (!p.online || p.out) return;
     const fee = Math.min(ol.stake, p.chips);
     p.chips -= fee; p.invested += fee; ol.pot += fee;
+    p.bet = fee;
   });
   olBroadcast({ type: "game_start", pot: ol.pot, callAmount: ol.callAmount, stake: ol.stake, round: ol.round });
   olBroadcast(olPublicState());
@@ -1212,10 +1346,9 @@ function showdown(winnerSeat, winnerName) {
   if (winnerSeat !== null && winnerSeat !== undefined && winnerSeat >= 0 && ol.players[winnerSeat]) {
     ol.players[winnerSeat].chips += ol.pot;
   }
-  // 积分
-  const winPts = Math.max(1, Math.round(ol.pot / ol.stake));
+  // 积分制结算：赢家积分 += 奖池总额；输家积分 -= 本局实际投入（可为负）
   const results = ol.players.map(p => {
-    const pts = p.seat === winnerSeat ? winPts : -Math.max(1, Math.round(p.invested / ol.stake));
+    const pts = p.seat === winnerSeat ? ol.pot : -p.invested;
     if (p.seat === winnerSeat) updateOnlineScore(p.name, true, pts);
     else updateOnlineScore(p.name, false, pts);
     return { seat: p.seat, name: p.name, cards: ol.cards[p.seat], hand: evaluateHand(ol.cards[p.seat]), pts, winner: p.seat === winnerSeat };
@@ -1233,9 +1366,9 @@ function hostNextRound() {
   ol.phase = "betting";
   ol.round++;
   // 下一局筹码沿用上局结算后余额（跨局累积），不重置为 500
-  ol.players.forEach(p => { p.folded = false; p.out = false; p.looked = false; p.invested = 0; });
+  ol.players.forEach(p => { p.folded = false; p.looked = false; p.invested = 0; p.bet = 0; p.allIn = false; });
   ol.cards = {};
-  ol.pot = 0; ol.callAmount = 1;
+  ol.pot = 0; ol.callAmount = 1; ol.maxBet = 1;
   ol.current = (prevWinner !== null && prevWinner !== undefined && prevWinner >= 0) ? (prevWinner + 1) % ol.players.length : 0;
   ol.lastActorDark = false; ol.lastActorBet = 1;
   ol.winner = null;
@@ -1257,7 +1390,7 @@ function handleGuestMessage(data) {
     $("ol-code-show").textContent = data.code;
     $("ol-role").textContent = "玩家";
     $("ol-status").textContent = "已加入房间";
-    ol.players = data.players.map(p => ({ seat: p.seat, name: p.name, chips: 500, folded: false, out: false, online: p.online, looked: false, invested: 0 }));
+    ol.players = data.players.map(p => ({ seat: p.seat, name: p.name, chips: 0, folded: false, out: false, online: p.online, looked: false, invested: 0, bet: 0, allIn: false }));
     applyPublicState(data.state);
     toast("成功加入房间！");
     renderOnlineRoom();
@@ -1265,7 +1398,7 @@ function handleGuestMessage(data) {
   else if (data.type === "room_busy") { toast("游戏已开始，无法加入"); cleanupOnline(); showScreen("screen-menu"); updateMenuStats(); }
   else if (data.type === "joined") {
     const exists = ol.players.find(p => p.seat === data.player.seat);
-    if (!exists) ol.players.push({ seat: data.player.seat, name: data.player.name, chips: 500, folded: false, out: false, online: true, looked: false, invested: 0 });
+    if (!exists) ol.players.push({ seat: data.player.seat, name: data.player.name, chips: 0, folded: false, out: false, online: true, looked: false, invested: 0, bet: 0, allIn: false });
     ol.players = ol.players.map(p => { const np = data.players.find(x => x.seat === p.seat); if (np) p.online = np.online; return p; });
     renderOnlineRoom();
   } else if (data.type === "left") {
@@ -1277,7 +1410,8 @@ function handleGuestMessage(data) {
     ol.myCards = data.cards;
     renderOnlineRoom();
   } else if (data.type === "game_start") {
-    ol.pot = data.pot; ol.callAmount = data.callAmount; ol.stake = data.stake; ol.round = data.round;
+    ol.pot = data.pot; ol.callAmount = data.callAmount; ol.stake = data.stake; ol.round = data.round; ol.maxBet = 1;
+    ol.players.forEach(p => { p.bet = 0; });
   } else if (data.type === "state") {
     applyPublicState(data);
     renderOnlineRoom();
@@ -1298,6 +1432,9 @@ function handleGuestMessage(data) {
     showOnlineModal(data);
   } else if (data.type === "new_round") {
     ol.round = data.round;
+    $("ol-modal").classList.remove("show");
+    clearOlAutoNext();
+    renderOnlineRoom();
   } else if (data.type === "err") { toast(data.msg); }
 }
 
@@ -1307,10 +1444,11 @@ function applyPublicState(st) {
     const p = ol.players.find(x => x.seat === sp.seat);
     if (p) {
       p.chips = sp.chips; p.folded = sp.folded; p.out = sp.out; p.online = sp.online;
-      p.looked = sp.looked; p.invested = sp.invested;
+      p.looked = sp.looked; p.invested = sp.invested; p.bet = sp.bet !== undefined ? sp.bet : 0;
+      p.allIn = sp.allIn !== undefined ? sp.allIn : false;
     }
   });
-  ol.pot = st.pot; ol.callAmount = st.callAmount; ol.current = st.current; ol.phase = st.phase;
+  ol.pot = st.pot; ol.callAmount = st.callAmount; ol.maxBet = st.maxBet !== undefined ? st.maxBet : 1; ol.current = st.current; ol.phase = st.phase;
   ol.round = st.round; ol.stake = st.stake; ol.winner = st.winner; ol.lastAction = st.lastAction;
   ol.lastActorDark = st.lastActorDark !== undefined ? st.lastActorDark : false;
   ol.lastActorBet = st.lastActorBet !== undefined ? st.lastActorBet : 0;
@@ -1407,10 +1545,10 @@ function renderOnlineRoom() {
     if (showBet) {
       const input = $("ol-bet-input");
       const minCall = olCostFor(me);
-      const minRaise = olMinRaiseCall();
+      const minRaise = olMinRaiseFor(me);
       if (!input.dataset.touched) input.value = Math.min(minCall, me.chips);
       const curVal = parseInt(input.value, 10);
-      $("ol-bet-hint").textContent = `跟注最低 ${minCall} ｜ 加注最低 ${minRaise} ｜ 你的筹码 ${me.chips}${ol.lastActorDark ? "（上家暗牌，跟注翻倍）" : ""}`;
+      $("ol-bet-hint").textContent = `跟注最低 ${minCall} ｜ 加注最低 ${minRaise} ｜ 你的积分 ${me.chips}`;
       $("ol-bet-min").textContent = "最低 " + minCall;
       $("ol-bet-2x").textContent = "×2 " + (minCall * 2 > me.chips ? me.chips : minCall * 2);
       $("ol-btn-raise").textContent = "加注 至 " + (isNaN(curVal) || curVal < minRaise ? minRaise : curVal);
@@ -1436,17 +1574,31 @@ function showOnlineModal(data) {
   $("ol-modal-cards").innerHTML = data.results.map(r =>
     `<div class="result-player"><div class="rp-name">${r.name}${r.winner ? " 🏆" : ""}：${r.hand.name}</div><div style="display:flex;gap:6px;justify-content:center;">${r.cards.map(c => cardHTML(c, true, true)).join("")}</div><div class="score-change" style="font-size:13px;">${r.pts >= 0 ? `<span style="color:#7dff9b">+${r.pts} 分</span>` : `<span style="color:#ff8a8a">${r.pts} 分</span>`}</div></div>`
   ).join("");
-  $("ol-modal-amt").textContent = "奖池 " + data.pot + " 筹码 · " + data.winnerName + " 赢得全部奖池";
+  $("ol-modal-amt").textContent = "奖池 " + data.pot + " 积分 · " + data.winnerName + " 赢得全部奖池";
   const meR = data.results.find(r => r.seat === ol.mySeat);
   if (meR) $("ol-modal-score").innerHTML = meR.pts >= 0 ? `本局积分 <span style="color:#7dff9b">+${meR.pts}</span>` : `本局积分 <span style="color:#ff8a8a">${meR.pts}</span>`;
   // 显示按钮
   const nextBtn = $("ol-modal-next");
-  nextBtn.style.display = ol.isHost ? "" : "none";
-  if (!ol.isHost) $("ol-modal-sub").textContent = "获胜者：" + data.winnerName + "（等待房主开始下一局）";
+  nextBtn.style.display = "";
+  if (!ol.isHost) $("ol-modal-sub").textContent = "获胜者：" + data.winnerName + "（下一局自动开始）";
   $("ol-modal").classList.add("show");
+  // 自动下一把：结算后立刻自动开始下一局（房主发牌），无倒计时等待；弹窗保留展示结果，点「下一局」进入新局
+  clearOlAutoNext();
+  const cd = $("ol-modal-countdown");
+  if (ol.isHost) {
+    cd.textContent = "新一局已自动开始，点击「下一局」进入";
+    if (ol.phase !== "betting") hostNextRound();
+  } else {
+    cd.textContent = "房主已自动开始下一局，点击「下一局」进入";
+  }
+}
+
+function clearOlAutoNext() {
+  if (ol.nextTimer) { clearTimeout(ol.nextTimer); ol.nextTimer = null; }
 }
 
 function cleanupOnline() {
+  clearOlAutoNext();
   if (ol.peer) { try { ol.peer.destroy(); } catch (e) {} }
   ol.peer = null; ol.conns = []; ol.hostConn = null; ol.isHost = false; ol.roomCode = "";
   ol.players = []; ol.cards = {}; ol.myCards = []; ol.mySeat = -1;
@@ -1460,6 +1612,7 @@ function cleanupOnline() {
 /* ---- 联机事件 ---- */
 $("menu-online").addEventListener("click", () => {
   showScreen("screen-online");
+  applyPlayerName(); // 应用当前输入框昵称
   $("ol-lobby").style.display = "block";
   $("ol-room").style.display = "none";
   $("ol-status").textContent = "正在加载联机组件…";
@@ -1500,17 +1653,17 @@ $("net-back").addEventListener("click", () => {
 $("ol-btn-start").addEventListener("click", hostStartGame);
 $("ol-btn-look").addEventListener("click", () => { olSendAction("look"); const me = olSeat(ol.mySeat); if (me) { me.looked = true; } renderOnlineRoom(); toast("已看牌，请继续跟注/加注/比牌或弃牌"); });
 $("ol-btn-call").addEventListener("click", () => { const me = olSeat(ol.mySeat); if (!me) return; const min = olCostFor(me); let amt = parseInt($("ol-bet-input").value, 10); if (isNaN(amt) || amt < min) amt = min; amt = Math.min(amt, me.chips); olSendAction("call", undefined, amt); });
-$("ol-btn-raise").addEventListener("click", () => { let target = parseInt($("ol-bet-input").value, 10); if (isNaN(target) || target < olMinRaiseCall()) target = olMinRaiseCall(); olSendAction("raise", undefined, undefined, target); });
+$("ol-btn-raise").addEventListener("click", () => { const me = olSeat(ol.mySeat); let target = parseInt($("ol-bet-input").value, 10); const minRaise = olMinRaiseFor(me); if (isNaN(target) || target < minRaise) target = minRaise; olSendAction("raise", undefined, undefined, target); });
 $("ol-btn-fold").addEventListener("click", () => olSendAction("fold"));
 $("ol-bet-input").addEventListener("input", () => {
   $("ol-bet-input").dataset.touched = "1";
   const me = olSeat(ol.mySeat);
-  const minRaise = olMinRaiseCall();
+  const minRaise = olMinRaiseFor(me);
   const curVal = parseInt($("ol-bet-input").value, 10);
   $("ol-btn-raise").textContent = "加注 至 " + (isNaN(curVal) || curVal < minRaise ? minRaise : curVal);
 });
-$("ol-bet-min").addEventListener("click", () => { const me = olSeat(ol.mySeat); const min = me ? olCostFor(me) : 1; $("ol-bet-input").value = Math.min(min, me ? me.chips : 500); $("ol-bet-input").dataset.touched = "1"; const minRaise = olMinRaiseCall(); $("ol-btn-raise").textContent = "加注 至 " + (min < minRaise ? minRaise : min); });
-$("ol-bet-2x").addEventListener("click", () => { const me = olSeat(ol.mySeat); const min = me ? olCostFor(me) : 1; $("ol-bet-input").value = Math.min(min * 2, me ? me.chips : 500); $("ol-bet-input").dataset.touched = "1"; const minRaise = olMinRaiseCall(); const v = Math.min(min * 2, me ? me.chips : 500); $("ol-btn-raise").textContent = "加注 至 " + (v < minRaise ? minRaise : v); });
+$("ol-bet-min").addEventListener("click", () => { const me = olSeat(ol.mySeat); const min = me ? olCostFor(me) : 1; $("ol-bet-input").value = Math.min(min, me ? me.chips : 500); $("ol-bet-input").dataset.touched = "1"; const minRaise = me ? olMinRaiseFor(me) : 1; $("ol-btn-raise").textContent = "加注 至 " + (min < minRaise ? minRaise : min); });
+$("ol-bet-2x").addEventListener("click", () => { const me = olSeat(ol.mySeat); const min = me ? olCostFor(me) : 1; $("ol-bet-input").value = Math.min(min * 2, me ? me.chips : 500); $("ol-bet-input").dataset.touched = "1"; const minRaise = me ? olMinRaiseFor(me) : 1; const v = Math.min(min * 2, me ? me.chips : 500); $("ol-btn-raise").textContent = "加注 至 " + (v < minRaise ? minRaise : v); });
 $("ol-btn-compare").addEventListener("click", () => {
   if (!ol.firstRoundOver) { toast("第一轮不能比牌，请先跟注/加注/弃牌"); return; }
   const targets = olAlive().filter(p => p.seat !== ol.mySeat);
@@ -1523,7 +1676,7 @@ $("ol-btn-compare").addEventListener("click", () => {
 });
 $("compare-cancel").addEventListener("click", localCancelCompare);
 $("ol-modal-close").addEventListener("click", () => $("ol-modal").classList.remove("show"));
-$("ol-modal-next").addEventListener("click", () => { $("ol-modal").classList.remove("show"); hostNextRound(); });
+$("ol-modal-next").addEventListener("click", () => { $("ol-modal").classList.remove("show"); if (ol.isHost && ol.phase !== "betting") hostNextRound(); });
 
 /* =====================================================================
  * 积分榜
