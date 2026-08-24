@@ -1345,7 +1345,7 @@ function hostNextRound() {
   ol.winner = null;
   ol.firstRoundOver = false; ol.actedSet = {}; ol.roundStarter = ol.current;
   ol.lastAction = "第 " + ol.round + " 局开始" + (prevWinner !== null && prevWinner !== undefined && prevWinner >= 0 ? "（上局赢家" + ol.players[prevWinner].name + "本局末位行动）" : "");
-  olBroadcast({ type: "new_round", round: ol.round });
+  olBroadcast({ type: "new_round", round: ol.round, current: ol.current, phase: "betting" });
   deal();
 }
 
@@ -1403,8 +1403,10 @@ function handleGuestMessage(data) {
     showOnlineModal(data);
   } else if (data.type === "new_round") {
     ol.round = data.round;
-    $("ol-modal").classList.remove("show");
-    clearOlAutoNext();
+    if (data.current !== undefined) ol.current = data.current;
+    if (data.phase) ol.phase = data.phase;
+    ol.firstRoundOver = false; ol.actedSet = {}; ol.roundStarter = ol.current;
+    // 不立即关闭结算弹窗，保持约2秒展示赢家与牌型后自动进入新局
     renderOnlineRoom();
   } else if (data.type === "err") { toast(data.msg); }
 }
