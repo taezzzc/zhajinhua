@@ -553,7 +553,7 @@ const state = {
   phase: "idle", deck: [],
   me: { id: "me", name: loadPlayerName(), cards: [], hand: null, chips: 0, folded: false, looked: false, invested: 0, bet: 0, allIn: false },
   ais: freshAiNames(loadPlayerName()).map((n, i) => ({ id: "ai" + i, name: n, cards: [], hand: null, chips: 0, folded: false, looked: false, invested: 0, bet: 0, allIn: false })),
-  pot: 0, stake: 1, round: 1, current: "me", callAmount: 1, maxBet: 1,
+  pot: 0, stake: 1, round: 1, current: "me", callAmount: 1, darkPrice: 1, maxBet: 1,
   winner: null, lock: false, nextTimer: null,
   lastActorDark: false, lastActorBet: 1,
   firstRoundOver: false, roundStarter: "me", actedSet: {}
@@ -639,13 +639,14 @@ function renderLocalActions() {
 }
 
 function setMsg(t, small) { $("msg").textContent = t; $("msg").className = "msg" + (small ? " small" : ""); }
-/* 跟注金额：锁定值 callAmount。暗牌玩家下注/加注到 X 时 callAmount=2X（恒定翻倍一次），明牌下注/加注到 Z 时 callAmount=Z；正常跟注不改变锁定值 */
-function costFor(id) { return state.callAmount; }
+/* 跟注金额（明暗双价）：明牌(looked=true)按锁定值 callAmount；暗牌按暗牌价 darkPrice。
+   暗牌玩家跟注/押注 X 时 darkPrice=X、callAmount=2X（恒定翻倍一次）；明牌加注到 Z 时 callAmount=Z；正常跟注不改变锁定值 */
+function costFor(id) { return localPlayer(id).looked ? state.callAmount : state.darkPrice; }
 /* 加注最小目标注：明牌至少比当前门槛高1；暗牌需使翻倍后门槛提高且高于当前最高实际注额与本人水平 */
 function minRaiseCall(id) {
   const p = localPlayer(id);
   if (p.looked) return Math.max(2, state.callAmount + 1);
-  return Math.max(2, Math.max(p.bet, state.maxBet) + 1, Math.floor(state.callAmount / 2) + 1);
+  return Math.max(2, Math.max(p.bet, state.maxBet) + 1, Math.floor(state.darkPrice / 2) + 1);
 }
 
 function startLocalRound() {
@@ -655,7 +656,7 @@ function startLocalRound() {
   state.deck = shuffle(makeDeck());
   // 重开新局：筹码跨局累积（不重置），仅清空手牌与局内状态
   localSeats().forEach(id => { const p = localPlayer(id); p.cards = []; p.hand = null; p.folded = false; p.looked = false; p.invested = 0; p.bet = 0; });
-  state.pot = 0; state.callAmount = 1; state.maxBet = 1;
+  state.pot = 0; state.callAmount = 1; state.darkPrice = 1; state.maxBet = 1;
   state.firstRoundOver = false; state.actedSet = {}; state.comparePending = null;
   const prevWinner = state.winner;
   state.winner = null;
@@ -691,9 +692,14 @@ function localDoCall(id, amt) {
   amt = Math.max(min, Math.floor(amt));
   p.chips -= amt; p.invested += amt; state.pot += amt;
   p.bet = amt;
-  // 正常跟注（amt==锁定值）不改变 callAmount；超额跟注视为变相加注，按明暗更新锁定值与最高实际注额
-  if (amt > state.callAmount) {
-    state.callAmount = p.looked ? amt : 2 * amt;
+  // 明暗双价：暗牌跟注 amt → darkPrice=max(darkPrice,amt)、callAmount=max(callAmount,2*amt)（恒定翻倍不递增）；
+  // 明牌跟注 amt → 不改变 callAmount 与 darkPrice（仅超额部分按加注处理）
+  if (!p.looked) {
+    state.darkPrice = Math.max(state.darkPrice, amt);
+    state.callAmount = Math.max(state.callAmount, 2 * amt);
+    state.maxBet = Math.max(state.maxBet, amt);
+  } else if (amt > state.callAmount) {
+    state.callAmount = amt;
     state.maxBet = Math.max(state.maxBet, amt);
   }
   localRecordBet(id, amt);
@@ -701,11 +707,17 @@ function localDoCall(id, amt) {
 }
 function localDoRaise(id, newCall) {
   const p = localPlayer(id);
-  const target = Math.max(minRaiseCall(id), Math.floor(newCall === undefined || isNaN(newCall) ? state.callAmount * 2 : newCall));
+  const target = Math.max(minRaiseCall(id), Math.floor(newCall === undefined || isNaN(newCall) ? (p.looked ? state.callAmount * 2 : state.darkPrice * 2) : newCall));
   const cost = target - p.bet;
   p.chips -= cost; p.invested += cost; state.pot += cost;
-  // 暗牌加注到 X → 锁定值 2X（恒定翻倍一次）；明牌加注到 Z → 锁定值 Z
-  state.callAmount = p.looked ? target : 2 * target;
+  // 明暗双价：暗牌加注到 target → darkPrice=target、callAmount=2*target（恒定翻倍一次）；
+  // 明牌加注到 Z → callAmount=Z、darkPrice 保持不变
+  if (!p.looked) {
+    state.darkPrice = target;
+    state.callAmount = 2 * target;
+  } else {
+    state.callAmount = target;
+  }
   state.maxBet = Math.max(state.maxBet, target);
   p.bet = target;
   localRecordBet(id, target);
@@ -790,10 +802,11 @@ function showLocalModal(winner, myPts, lb) {
   $("modal-score").innerHTML = myPts >= 0 ? `积分 <span style="color:#7dff9b">+${myPts}</span> · 总分 ${lb.score}` : `积分 <span style="color:#ff8a8a">${myPts}</span> · 总分 ${lb.score}`;
   state.round++;
   $("modal").classList.add("show");
-  // 自动下一把：结算后立刻自动开始下一局，无倒计时等待；弹窗保留展示结果，点「下一局」/「关闭」进入新局
+  // 自动下一把：结算后立刻自动开始下一局，无倒计时等待；弹窗保留展示结果，约2秒后自动关闭进入新局
   clearLocalAutoNext();
-  $("modal-countdown").textContent = "新一局已自动开始，点击「下一局」进入";
+  $("modal-countdown").textContent = "新一局已自动开始…";
   if (state.phase !== "betting") startLocalRound();
+  state.nextTimer = setTimeout(() => { state.nextTimer = null; $("modal").classList.remove("show"); renderLocal(); }, 2000);
 }
 
 function aiAct(id) {
@@ -950,7 +963,7 @@ function genCode(len) { let s = ""; for (let i = 0; i < len; i++) s += CODE_CHAR
 const ol = {
   peer: null, conns: [], isHost: false, roomCode: "", myName: loadPlayerName(), mySeat: -1,
   players: [], cards: {}, myCards: [],
-  pot: 0, callAmount: 1, maxBet: 1, current: -1, phase: "lobby", round: 1, stake: 1,
+  pot: 0, callAmount: 1, darkPrice: 1, maxBet: 1, current: -1, phase: "lobby", round: 1, stake: 1,
   lock: false, hostConn: null, heartTimer: null, nextTimer: null,
   lastActorDark: false, lastActorBet: 1,
   firstRoundOver: false, roundStarter: 0, actedSet: {}, comparePending: null
@@ -959,12 +972,12 @@ const ol = {
 function olSeat(seat) { return ol.players.find(p => p.seat === seat); }
 function olAlive() { return ol.players.filter(p => !p.folded && !p.out); }
 function olActiveCount() { return olAlive().length; }
-/* 跟注金额：锁定值 callAmount。暗牌玩家下注/加注到 X 时 callAmount=2X（恒定翻倍一次），明牌下注/加注到 Z 时 callAmount=Z；正常跟注不改变锁定值 */
-function olCostFor(p) { return ol.callAmount; }
+/* 跟注金额：明暗双价。暗牌玩家看自己的跟注价 darkPrice；看牌玩家看锁定值 callAmount。暗牌跟注/下注 amt 时 darkPrice=max(darkPrice,amt)、callAmount=max(callAmount,2*amt)；暗牌加注到 target 时 darkPrice=target、callAmount=2*target；明牌加注到 Z 时 callAmount=Z、darkPrice 不变；明牌正常跟注不改两者 */
+function olCostFor(p) { return p.looked ? ol.callAmount : ol.darkPrice; }
 /* 加注最小目标注：明牌至少比当前门槛高1；暗牌需使翻倍后门槛提高且高于当前最高实际注额与本人水平 */
 function olMinRaiseFor(p) {
   if (p.looked) return Math.max(2, ol.callAmount + 1);
-  return Math.max(2, Math.max(p.bet, ol.maxBet) + 1, Math.floor(ol.callAmount / 2) + 1);
+  return Math.max(2, Math.max(p.bet, ol.maxBet) + 1, Math.floor(ol.darkPrice / 2) + 1);
 }
 function olRecordBet(seat, newBet) {
   const p = ol.players[seat];
@@ -980,7 +993,7 @@ function olPublicState() {
   return {
     type: "state",
     players: ol.players.map(p => ({ seat: p.seat, name: p.name, chips: p.chips, folded: p.folded, out: p.out, online: p.online, looked: p.looked, invested: p.invested, bet: p.bet, allIn: p.allIn })),
-    pot: ol.pot, callAmount: ol.callAmount, maxBet: ol.maxBet, current: ol.current, phase: ol.phase,
+    pot: ol.pot, callAmount: ol.callAmount, darkPrice: ol.darkPrice, maxBet: ol.maxBet, current: ol.current, phase: ol.phase,
     round: ol.round, stake: ol.stake, winner: ol.winner, lastAction: ol.lastAction,
     lastActorDark: ol.lastActorDark, lastActorBet: ol.lastActorBet,
     firstRoundOver: ol.firstRoundOver
@@ -1160,20 +1173,30 @@ function handleHostAction(conn, data) {
     if (isNaN(amt) || amt < min) amt = min;
     p.chips -= amt; p.invested += amt; ol.pot += amt;
     p.bet = amt;
-    // 正常跟注（amt==锁定值）不改变 callAmount；超额跟注视为变相加注，按明暗更新锁定值与最高实际注额
-    if (amt > ol.callAmount) {
-      ol.callAmount = p.looked ? amt : 2 * amt;
+    // 明暗双价：暗牌跟注 amt → darkPrice=max(darkPrice,amt)、callAmount=max(callAmount,2*amt)（恒定翻倍不递增）；
+    // 明牌跟注 amt → 不改变 callAmount 与 darkPrice（仅超额部分按加注处理）
+    if (!p.looked) {
+      ol.darkPrice = Math.max(ol.darkPrice, amt);
+      ol.callAmount = Math.max(ol.callAmount, 2 * amt);
+      ol.maxBet = Math.max(ol.maxBet, amt);
+    } else if (amt > ol.callAmount) {
+      ol.callAmount = amt;
       ol.maxBet = Math.max(ol.maxBet, amt);
     }
-    ol.lastAction = p.name + " 跟注 " + amt;
+    ol.lastAction = p.name + " 跟注 " + amt + (p.looked ? "" : "（暗牌翻倍）");
     olRecordBet(data.seat, amt);
     advanceTurn();
   } else if (act === "raise") {
-    const target = Math.max(olMinRaiseFor(p), parseInt(data.newCall, 10) || ol.callAmount * 2);
+    const target = Math.max(olMinRaiseFor(p), parseInt(data.newCall, 10) || (p.looked ? ol.callAmount * 2 : ol.darkPrice * 2));
     const cost = target - p.bet;
     p.chips -= cost; p.invested += cost; ol.pot += cost;
-    // 暗牌加注到 X → 锁定值 2X（恒定翻倍一次）；明牌加注到 Z → 锁定值 Z
-    ol.callAmount = p.looked ? target : 2 * target;
+    // 明暗双价：暗牌加注到 target → darkPrice=target、callAmount=2*target（恒定翻倍一次）；明牌加注到 Z → callAmount=Z
+    if (!p.looked) {
+      ol.darkPrice = target;
+      ol.callAmount = 2 * target;
+    } else {
+      ol.callAmount = target;
+    }
     ol.maxBet = Math.max(ol.maxBet, target);
     p.bet = target;
     ol.lastAction = p.name + " 加注至 " + target + (p.looked ? "" : "（暗牌翻倍）");
@@ -1249,7 +1272,7 @@ function hostStartGame() {
   // 开局筹码沿用上局余额（跨局累积），不重置为 500
   ol.players.forEach(p => { p.folded = false; p.looked = false; p.invested = 0; p.bet = 0; p.allIn = false; });
   ol.cards = {};
-  ol.pot = 0; ol.callAmount = 1; ol.maxBet = 1; ol.current = 0;
+  ol.pot = 0; ol.callAmount = 1; ol.darkPrice = 1; ol.maxBet = 1; ol.current = 0;
   ol.lastActorDark = false; ol.lastActorBet = 1;
   ol.firstRoundOver = false; ol.actedSet = {}; ol.roundStarter = 0;
   deal();
@@ -1313,7 +1336,7 @@ function hostNextRound() {
   // 下一局筹码沿用上局结算后余额（跨局累积），不重置为 500
   ol.players.forEach(p => { p.folded = false; p.looked = false; p.invested = 0; p.bet = 0; p.allIn = false; });
   ol.cards = {};
-  ol.pot = 0; ol.callAmount = 1; ol.maxBet = 1;
+  ol.pot = 0; ol.callAmount = 1; ol.darkPrice = 1; ol.maxBet = 1;
   ol.current = (prevWinner !== null && prevWinner !== undefined && prevWinner >= 0) ? (prevWinner + 1) % ol.players.length : 0;
   ol.lastActorDark = false; ol.lastActorBet = 1;
   ol.winner = null;
@@ -1393,7 +1416,7 @@ function applyPublicState(st) {
       p.allIn = sp.allIn !== undefined ? sp.allIn : false;
     }
   });
-  ol.pot = st.pot; ol.callAmount = st.callAmount; ol.maxBet = st.maxBet !== undefined ? st.maxBet : 1; ol.current = st.current; ol.phase = st.phase;
+  ol.pot = st.pot; ol.callAmount = st.callAmount; ol.darkPrice = st.darkPrice !== undefined ? st.darkPrice : 1; ol.maxBet = st.maxBet !== undefined ? st.maxBet : 1; ol.current = st.current; ol.phase = st.phase;
   ol.round = st.round; ol.stake = st.stake; ol.winner = st.winner; ol.lastAction = st.lastAction;
   ol.lastActorDark = st.lastActorDark !== undefined ? st.lastActorDark : false;
   ol.lastActorBet = st.lastActorBet !== undefined ? st.lastActorBet : 0;
@@ -1527,15 +1550,20 @@ function showOnlineModal(data) {
   nextBtn.style.display = "";
   if (!ol.isHost) $("ol-modal-sub").textContent = "获胜者：" + data.winnerName + "（下一局自动开始）";
   $("ol-modal").classList.add("show");
-  // 自动下一把：结算后立刻自动开始下一局（房主发牌），无倒计时等待；弹窗保留展示结果，点「下一局」进入新局
+  // 自动下一把：结算后立刻自动开始下一局（房主发牌），无倒计时等待；弹窗保留展示结果，约2秒后自动关闭进入新局
   clearOlAutoNext();
   const cd = $("ol-modal-countdown");
   if (ol.isHost) {
-    cd.textContent = "新一局已自动开始，点击「下一局」进入";
+    cd.textContent = "新一局已自动开始…";
     if (ol.phase !== "betting") hostNextRound();
   } else {
-    cd.textContent = "房主已自动开始下一局，点击「下一局」进入";
+    cd.textContent = "房主已自动开始下一局…";
   }
+  ol.nextTimer = setTimeout(() => {
+    ol.nextTimer = null;
+    $("ol-modal").classList.remove("show");
+    renderOnlineRoom();
+  }, 2000);
 }
 
 function clearOlAutoNext() {
