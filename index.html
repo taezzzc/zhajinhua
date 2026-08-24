@@ -1324,7 +1324,10 @@ function showdown(winnerSeat, winnerName) {
   const board = loadOnlineBoard();
   addOnlineGame(results, winnerName, ol.pot, ol.stake);
   const winnerChips = (winnerSeat !== null && winnerSeat !== undefined && winnerSeat >= 0 && ol.players[winnerSeat]) ? ol.players[winnerSeat].chips : 0;
-  olBroadcast({ type: "showdown", results, pot: ol.pot, winnerSeat, winnerName, winnerChips, board: loadOnlineBoard() });
+  const sdData = { results, pot: ol.pot, winnerSeat, winnerName, winnerChips, board: loadOnlineBoard() };
+  olBroadcast({ type: "showdown", ...sdData });
+  // 房主本地也展示结算弹窗，弹窗内自动触发 hostNextRound 进入新局（约2秒后自动关闭）
+  showOnlineModal(sdData);
   renderOnlineRoom();
 }
 
