@@ -1156,9 +1156,10 @@ function handleHostLeave(conn) {
       p.online = false; p.out = true; p.folded = true;
       toast(p.name + " 掉线了（已自动弃牌，游戏继续）");
       olBroadcast({ type: "left", seat: p.seat, name: p.name, players: ol.players.map(x => ({ seat: x.seat, name: x.name, online: x.online })) });
+      const aliveBefore = olAlive().length;
       checkAutoEnd();
-      // 若掉线玩家正处于行动回合，自动轮到下一家
-      if (ol.phase === "betting" && ol.current === p.seat) advanceTurn();
+      // 若掉线玩家正处于行动回合且未触发结算开新局，自动轮到下一家
+      if (aliveBefore > 1 && ol.phase === "betting" && ol.current === p.seat) advanceTurn();
       renderOnlineRoom();
     }
   }
@@ -1231,14 +1232,16 @@ function handleHostAction(conn, data) {
     loser.folded = true;
     ol.lastAction = p.name + " 与 " + tp.name + " 比牌，" + (res >= 0 ? tp.name : p.name) + " 落败";
     olBroadcast({ type: "compare_result", a: p.seat, b: target, loser: loserSeat, winner: res >= 0 ? p.seat : target, handA: { cards: ol.cards[p.seat], name: ph.name }, handB: { cards: ol.cards[target], name: th.name } });
+    const aliveBefore = olAlive().length;
     checkAutoEnd();
-    if (ol.phase === "betting") advanceTurn();
+    if (aliveBefore > 1) advanceTurn();
   } else if (act === "fold") {
     p.folded = true;
     ol.lastAction = p.name + " 弃牌";
     olBroadcast({ type: "folded", seat: p.seat, name: p.name });
+    const aliveBefore = olAlive().length;
     checkAutoEnd();
-    if (ol.phase === "betting") advanceTurn();
+    if (aliveBefore > 1) advanceTurn();
   }
   olBroadcast(olPublicState());
   renderOnlineRoom();
