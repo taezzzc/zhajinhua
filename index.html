@@ -611,14 +611,14 @@ function renderLocalActions() {
   $("btn-look").disabled = !(myTurn && !looked);
   $("btn-call").disabled = !myTurn;
   $("btn-raise").disabled = !myTurn;
-  $("btn-compare").disabled = !(myTurn && localAlive().length > 1 && state.firstRoundOver);
+  $("btn-compare").disabled = !(myTurn && localCanCompare("me"));
   $("btn-fold").disabled = !myTurn;
   $("btn-start").disabled = betting || state.phase === "showdown";
   $("btn-look").textContent = "看牌";
   const myCost = costFor("me");
   $("btn-call").textContent = looked ? ("看牌跟注 " + myCost) : ("暗牌跟注 " + myCost);
   $("btn-raise").textContent = "加注 至 " + minRaiseCall("me");
-  $("btn-compare").textContent = state.firstRoundOver ? ("比牌 " + myCost) : "第一轮不能比牌";
+  $("btn-compare").textContent = localCanCompare("me") ? ("比牌 " + myCost) : "第一轮不能比牌";
   $("btn-fold").textContent = "弃牌";
   $("btn-start").textContent = "开始新一局";
   // 押注金额自选栏：轮到玩家时显示，默认填最低跟注额
@@ -859,12 +859,19 @@ function compareTarget(id) {
 }
 /* 人机模式：比牌先自动支付当前跟注金额，再选择比牌对象（目标自选） */
 let localComparePending = null;
+/* 可否比牌：首轮中除当前玩家外其他存活玩家均已行动过（轮到本圈最后一个行动者时即可比牌），或首轮已结束 */
+function localCanCompare(id) {
+  const alive = localAlive();
+  if (alive.length <= 1) return false;
+  if (state.firstRoundOver) return true;
+  return alive.every(x => x === id || state.actedSet[x]);
+}
 function localOpenCompare() {
   if (state.phase !== "betting" || state.current !== "me") return;
   if (localComparePending) localCancelCompare(); // 恢复上次未完成的预扣费用
   const targets = localAlive().filter(x => x !== "me");
   if (!targets.length) return;
-  if (!state.firstRoundOver) { setMsg("第一轮不能比牌"); return; }
+  if (!localCanCompare("me")) { setMsg("第一轮不能比牌"); return; }
   const fee = costFor("me");
   const p = state.me;
   // 先自动支付当前跟注金额，再弹出选择比牌对象
@@ -972,6 +979,12 @@ const ol = {
 function olSeat(seat) { return ol.players.find(p => p.seat === seat); }
 function olAlive() { return ol.players.filter(p => !p.folded && !p.out); }
 function olActiveCount() { return olAlive().length; }
+/* 比牌资格：首轮未结束前，仅当除自己外所有存活玩家都已行动过（即本圈最后一个行动者）才允许比牌；首轮结束后任何人随时可比 */
+function olCanCompare(seat) {
+  if (ol.firstRoundOver) return true;
+  const alive = olAlive().filter(p => p.seat !== seat);
+  return alive.length > 0 && alive.every(p => ol.actedSet[p.seat]);
+}
 /* 跟注金额：明暗双价。暗牌玩家看自己的跟注价 darkPrice；看牌玩家看锁定值 callAmount。暗牌跟注/下注 amt 时 darkPrice=max(darkPrice,amt)、callAmount=max(callAmount,2*amt)；暗牌加注到 target 时 darkPrice=target、callAmount=2*target；明牌加注到 Z 时 callAmount=Z、darkPrice 不变；明牌正常跟注不改两者 */
 function olCostFor(p) { return p.looked ? ol.callAmount : ol.darkPrice; }
 /* 加注最小目标注：明牌至少比当前门槛高1；暗牌需使翻倍后门槛提高且高于当前最高实际注额与本人水平 */
@@ -1203,7 +1216,7 @@ function handleHostAction(conn, data) {
     olRecordBet(data.seat, target);
     advanceTurn();
   } else if (act === "compare") {
-    if (!ol.firstRoundOver) { sendErr("第一轮不能比牌，请先跟注/加注/弃牌"); return; }
+    if (!olCanCompare(p.seat)) { sendErr("还没轮到你比牌，请先等其他人行动"); return; }
     const target = data.target;
     const tp = ol.players[target];
     if (!tp || tp.folded || tp.out || !tp.online || target === p.seat) return;
@@ -1501,11 +1514,11 @@ function renderOnlineRoom() {
   $("ol-btn-look").disabled = !(myTurn && !myLooked);
   $("ol-btn-call").disabled = !myTurn;
   $("ol-btn-raise").disabled = !myTurn;
-  $("ol-btn-compare").disabled = !(myTurn && ol.firstRoundOver && olAlive().filter(p => p.seat !== ol.mySeat).length > 0);
+  $("ol-btn-compare").disabled = !(myTurn && olCanCompare(ol.mySeat) && olAlive().filter(p => p.seat !== ol.mySeat).length > 0);
   $("ol-btn-fold").disabled = !myTurn;
   const myCost = me && ol.phase === "betting" ? olCostFor(me) : 0;
   $("ol-btn-call").textContent = myLooked ? ("看牌跟注 " + myCost) : ("暗牌跟注 " + myCost);
-  $("ol-btn-compare").textContent = (ol.firstRoundOver ? "比牌 " + myCost : "第一轮不能比牌");
+  $("ol-btn-compare").textContent = (olCanCompare(ol.mySeat) ? "比牌 " + myCost : "第一轮不能比牌");
   $("ol-btn-fold").textContent = "弃牌";
   $("ol-btn-look").textContent = "看牌";
   if (ol.phase === "showdown") { ["ol-btn-look","ol-btn-call","ol-btn-raise","ol-btn-compare","ol-btn-fold"].forEach(id => $(id).style.display = "none"); }
@@ -1643,7 +1656,7 @@ $("ol-bet-input").addEventListener("input", () => {
 $("ol-bet-min").addEventListener("click", () => { const me = olSeat(ol.mySeat); const min = me ? olCostFor(me) : 1; $("ol-bet-input").value = min; $("ol-bet-input").dataset.touched = "1"; const minRaise = me ? olMinRaiseFor(me) : 1; $("ol-btn-raise").textContent = "加注 至 " + (min < minRaise ? minRaise : min); });
 $("ol-bet-2x").addEventListener("click", () => { const me = olSeat(ol.mySeat); const min = me ? olCostFor(me) : 1; const v = min * 2; $("ol-bet-input").value = v; $("ol-bet-input").dataset.touched = "1"; const minRaise = me ? olMinRaiseFor(me) : 1; $("ol-btn-raise").textContent = "加注 至 " + (v < minRaise ? minRaise : v); });
 $("ol-btn-compare").addEventListener("click", () => {
-  if (!ol.firstRoundOver) { toast("第一轮不能比牌，请先跟注/加注/弃牌"); return; }
+  if (!olCanCompare(ol.mySeat)) { toast("第一轮不能比牌，请先跟注/加注/弃牌"); return; }
   const targets = olAlive().filter(p => p.seat !== ol.mySeat);
   if (targets.length === 0) return;
   if (targets.length === 1) { olSendAction("compare", targets[0].seat); return; }
