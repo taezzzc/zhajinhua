@@ -1035,9 +1035,7 @@ $("btn-start").addEventListener("click", () => { $("modal").classList.remove("sh
 $("btn-look").addEventListener("click", () => { if (state.phase !== "betting" || state.current !== "me") return; state.me.looked = true; setMsg("你已看牌：" + state.me.hand.name + "，请继续跟注/加注/比牌或弃牌"); renderLocal(); });
 $("btn-call").addEventListener("click", () => {
   if (state.phase !== "betting" || state.current !== "me") return;
-  const min = costFor("me");
-  let amt = parseInt($("local-bet-input").value, 10);
-  if (isNaN(amt) || amt < min) { setMsg("跟注金额不能低于 " + min + "，已按最低跟注"); amt = min; }
+  const amt = costFor("me");
   const ok = localDoCall("me", amt); if (!ok) return;
   if (!state.me.folded) setMsg("你跟注 " + amt);
   renderLocal(); localNextTurn();
@@ -1047,10 +1045,11 @@ $("btn-raise").addEventListener("click", () => {
   let target = parseInt($("local-bet-input").value, 10);
   if (isNaN(target) || target < minRaiseCall("me")) { setMsg("加注目标注不能低于 " + minRaiseCall("me") + "，已按默认加注"); target = minRaiseCall("me"); }
   const ok = localDoRaise("me", target); if (!ok) return;
+  $("local-bet-input").value = ""; $("local-bet-input").dataset.touched = "";
   setMsg("你加注了！当前注 " + state.callAmount); renderLocal(); localNextTurn();
 });
-$("btn-compare").addEventListener("click", localOpenCompare);
-$("btn-fold").addEventListener("click", () => { if (state.phase !== "betting" || state.current !== "me") return; localDoFold("me"); });
+$("btn-compare").addEventListener("click", () => { $("local-bet-input").value = ""; $("local-bet-input").dataset.touched = ""; localOpenCompare(); });
+$("btn-fold").addEventListener("click", () => { if (state.phase !== "betting" || state.current !== "me") return; $("local-bet-input").value = ""; $("local-bet-input").dataset.touched = ""; localDoFold("me"); });
 $("local-bet-input").addEventListener("input", () => { $("local-bet-input").dataset.touched = "1"; });
 $("local-bet-min").addEventListener("click", () => { $("local-bet-input").value = costFor("me"); $("local-bet-input").dataset.touched = "1"; });
 $("local-bet-2x").addEventListener("click", () => { $("local-bet-input").value = costFor("me") * 2; $("local-bet-input").dataset.touched = "1"; });
@@ -1686,6 +1685,8 @@ function renderOnlineRoom() {
 
 function olSendAction(action, target, amount, newCall) {
   if (ol.phase !== "betting") return;
+  const betInput = $("ol-bet-input");
+  if (betInput) { betInput.value = ""; betInput.dataset.touched = ""; }
   const obj = { type: "action", action, seat: ol.mySeat, target, amount, newCall };
   if (ol.isHost) {
     // 房主是权威节点且无 hostConn，行动必须本地处理，否则点击跟注/暗牌会静默丢失
@@ -1792,7 +1793,7 @@ $("net-back").addEventListener("click", () => {
 });
 $("ol-btn-start").addEventListener("click", hostStartGame);
 $("ol-btn-look").addEventListener("click", () => { olSendAction("look"); const me = olSeat(ol.mySeat); if (me) { me.looked = true; } renderOnlineRoom(); toast("已看牌，请继续跟注/加注/比牌或弃牌"); });
-$("ol-btn-call").addEventListener("click", () => { const me = olSeat(ol.mySeat); if (!me) return; const min = olCostFor(me); let amt = parseInt($("ol-bet-input").value, 10); if (isNaN(amt) || amt < min) amt = min; olSendAction("call", undefined, amt); });
+$("ol-btn-call").addEventListener("click", () => { const me = olSeat(ol.mySeat); if (!me) return; const min = olCostFor(me); olSendAction("call", undefined, min); });
 $("ol-btn-raise").addEventListener("click", () => { const me = olSeat(ol.mySeat); let target = parseInt($("ol-bet-input").value, 10); const minRaise = olMinRaiseFor(me); if (isNaN(target) || target < minRaise) target = minRaise; olSendAction("raise", undefined, undefined, target); });
 $("ol-btn-fold").addEventListener("click", () => olSendAction("fold"));
 $("ol-bet-input").addEventListener("input", () => {
