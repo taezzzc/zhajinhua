@@ -57,22 +57,36 @@ body {
 
 /* 牌区 */
 .cards-area { display: flex; gap: 6px; margin-top: 4px; justify-content: center; }
-.card { width: 62px; height: 90px; border-radius: 10px; background: linear-gradient(150deg, #ffffff 0%, #f7f3e8 48%, #e9e2cf 100%); color: #222; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 24px; font-weight: bold; box-shadow: 0 4px 10px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.9); border: 1px solid rgba(0,0,0,.1); position: relative; overflow: hidden; animation: dealIn .45s ease-out both; }
+.card { width: 62px; height: 90px; border-radius: 10px; background: linear-gradient(150deg, #ffffff 0%, #f7f3e8 48%, #e9e2cf 100%); color: #222; display: block; box-shadow: 0 4px 10px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.9); border: 1px solid rgba(0,0,0,.1); position: relative; overflow: hidden; animation: dealIn .45s ease-out both; }
 .card:nth-child(2) { animation-delay: .07s; }
 .card:nth-child(3) { animation-delay: .14s; }
 .card::before { content: ""; position: absolute; top: 3%; left: 5%; width: 52%; height: 30%; background: linear-gradient(180deg, rgba(255,255,255,.9), rgba(255,255,255,0)); border-radius: 8px; pointer-events: none; }
 .card.red { color: #d0353f; }
 .card.black { color: #23262e; }
+.card .corner { position: absolute; display: flex; flex-direction: column; align-items: center; line-height: 1; font-weight: bold; z-index: 2; pointer-events: none; }
+.card .corner b { font-size: 14px; }
+.card .corner i { font-style: normal; font-size: 11px; }
+.card .corner.tl { top: 5px; left: 5px; }
+.card .corner.br { bottom: 5px; right: 5px; transform: rotate(180deg); }
+.card .pips { position: absolute; top: 24%; bottom: 24%; left: 21%; right: 21%; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(4, 1fr); }
+.card .pip { font-style: normal; font-size: 13px; line-height: 1; display: flex; align-items: center; justify-content: center; }
+.card .pip.big { font-size: 30px; grid-area: 1 / 1 / 5 / 4; }
+.card .face { position: absolute; top: 25%; bottom: 25%; left: 15%; right: 15%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; border: 2px solid currentColor; border-radius: 7px; background: rgba(255,255,255,.4); }
+.card .face b { font-size: 25px; line-height: 1; }
+.card .face i { font-style: normal; font-size: 13px; line-height: 1; }
 .card.back { background: repeating-linear-gradient(45deg, #24508f, #24508f 6px, #3a74c0 6px, #3a74c0 12px); border: 1px solid rgba(0,0,0,.25); color: transparent; }
 .card.back::before { background: rgba(255,255,255,.08); }
-.card.back::after { content: "★"; color: rgba(255,255,255,.6); font-size: 22px; text-shadow: 0 0 8px rgba(255,255,255,.35); }
-.card:not(.back)::after { content: attr(data-suit) attr(data-rank); position: absolute; bottom: 6%; right: 7%; font-size: 11px; font-weight: bold; transform: rotate(180deg); opacity: .9; }
-.card .corner { font-size: 13px; line-height: 1; }
-.card .big { font-size: 28px; line-height: 1.1; text-shadow: 0 1px 1px rgba(0,0,0,.08); }
-.card.sm { width: 46px; height: 66px; font-size: 17px; }
-.card.sm .corner { font-size: 10px; }
-.card.sm .big { font-size: 20px; }
-.card.sm:not(.back)::after { font-size: 8px; }
+.card.back::after { content: "★"; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: rgba(255,255,255,.6); font-size: 22px; text-shadow: 0 0 8px rgba(255,255,255,.35); }
+.card.sm { width: 46px; height: 66px; }
+.card.sm .corner b { font-size: 10px; }
+.card.sm .corner i { font-size: 8px; }
+.card.sm .corner.tl { top: 3px; left: 3px; }
+.card.sm .corner.br { bottom: 3px; right: 3px; }
+.card.sm .pips { top: 21%; bottom: 21%; left: 18%; right: 18%; }
+.card.sm .pip { font-size: 9px; }
+.card.sm .pip.big { font-size: 21px; }
+.card.sm .face b { font-size: 17px; }
+.card.sm .face i { font-size: 9px; }
 .card.sm.back::after { font-size: 16px; }
 @keyframes dealIn {
   0% { transform: translateY(-26px) rotateX(80deg) scale(.8); opacity: 0; }
@@ -164,12 +178,22 @@ body {
 .hint { font-size: 12px; color: #8fae99; text-align: center; margin-top: 6px; line-height: 1.6; }
 
 @media (max-width: 480px) {
-  .card { width: 52px; height: 78px; font-size: 20px; }
-  .card .corner { font-size: 11px; }
-  .card .big { font-size: 23px; }
-  .card.sm { width: 42px; height: 60px; font-size: 15px; }
-  .card.sm .corner { font-size: 9px; }
-  .card.sm .big { font-size: 18px; }
+  .card { width: 52px; height: 78px; }
+  .card .corner b { font-size: 12px; }
+  .card .corner i { font-size: 9px; }
+  .card .corner.tl { top: 4px; left: 4px; }
+  .card .corner.br { bottom: 4px; right: 4px; }
+  .card .pip { font-size: 11px; }
+  .card .pip.big { font-size: 26px; }
+  .card .face b { font-size: 21px; }
+  .card .face i { font-size: 11px; }
+  .card.sm { width: 42px; height: 60px; }
+  .card.sm .corner b { font-size: 9px; }
+  .card.sm .corner i { font-size: 7px; }
+  .card.sm .pip { font-size: 8px; }
+  .card.sm .pip.big { font-size: 18px; }
+  .card.sm .face b { font-size: 15px; }
+  .card.sm .face i { font-size: 8px; }
   .btn { font-size: 13px; padding: 10px 2px; }
   .topbar h1 { font-size: 18px; }
   .pot-area { font-size: 18px; padding: 6px 16px; }
@@ -257,6 +281,10 @@ body {
         <p style="font-size:12px;color:#bcd9c5;margin-bottom:8px;">输入好友分享的房间码</p>
         <input id="ol-code-input" placeholder="房间码（4-8位）" maxlength="8" autocomplete="off">
         <button class="btn" id="ol-join">加入房间</button>
+      </div>
+      <div class="ol-card">
+        <h3>📜 对局历史</h3>
+        <div class="history-list" id="ol-history"></div>
       </div>
       <div class="hint">开局每人押 1 底注 ｜ 暗牌押 X 后，后续所有玩家跟注最低恒为 2X（不逐家递增）｜ 跟注 1 起步、加注 2 以上、金额自选 ｜ 积分制 0 起步、赢家通吃 ｜ 每局赢家下局末位行动（轮庄）</div>
     </div>
@@ -468,12 +496,28 @@ function addLocalGame(win, pts) {
   saveLocalBoard(b);
   return b;
 }
-function addOnlineGame(players, winnerName, pot, stake) {
+function addOnlineGame(results, winnerName, pot, stake) {
   const b = loadOnlineBoard();
-  b.history.unshift({ t: new Date().toLocaleString(), winner: winnerName, players: players.map(p => ({ n: p.name, pts: p.pts })) });
+  const winnerR = (results || []).find(r => r.winner) || null;
+  b.history.unshift({
+    t: new Date().toLocaleString(),
+    winner: winnerName,
+    winnerHand: winnerR && winnerR.hand ? winnerR.hand.name : "",
+    players: (results || []).map(r => ({ n: r.name, pts: r.pts, hand: r.hand ? r.hand.name : "" }))
+  });
   if (b.history.length > 30) b.history.length = 30;
   saveOnlineBoard(b);
   return b;
+}
+/* 渲染联机大厅的对局历史（赢家 + 赢家牌型） */
+function renderOnlineHistory() {
+  const box = $("ol-history");
+  if (!box) return;
+  const b = loadOnlineBoard();
+  if (!b.history.length) { box.innerHTML = '<div style="text-align:center;color:#5d7d68;">暂无对局记录</div>'; return; }
+  box.innerHTML = b.history.map(h =>
+    `<div>${h.t} ｜ 🏆 ${h.winner} <span class="pos">（${h.winnerHand || "牌型未知"}）</span></div>`
+  ).join("");
 }
 function onlinePlayerScore(name) {
   const b = loadOnlineBoard();
@@ -507,11 +551,42 @@ function showScreen(id) {
 }
 
 /* ========== 渲染工具 ========== */
+/* 实体扑克牌点数位置（3列 x 4行 网格） */
+const PIP_MAP = {
+  2: [[0,0],[3,2]],
+  3: [[0,0],[1,1],[3,2]],
+  4: [[0,0],[0,2],[3,0],[3,2]],
+  5: [[0,0],[0,2],[3,0],[3,2],[1,1]],
+  6: [[0,0],[1,0],[2,0],[0,2],[1,2],[2,2]],
+  7: [[0,0],[1,0],[2,0],[0,2],[1,2],[2,2],[1,1]],
+  8: [[0,0],[1,0],[2,0],[3,0],[0,2],[1,2],[2,2],[3,2]],
+  9: [[0,0],[1,0],[2,0],[3,0],[0,2],[1,2],[2,2],[3,2],[2,1]],
+  10: [[0,0],[1,0],[2,0],[3,0],[0,2],[1,2],[2,2],[3,2],[1,1],[2,1]]
+};
+/* 实体扑克牌：左上/右下双角标 + 中央按点数排列花色（A居中 / 2-10点数 / JQK字母牌面） */
 function cardHTML(card, faceUp, sm) {
   const cls = "card" + (sm ? " sm" : "");
   if (!faceUp) return `<div class="${cls} back"></div>`;
   const c = card.color === "red" ? " red" : " black";
-  return `<div class="${cls}${c}" data-suit="${card.suit}" data-rank="${RANK_LABEL[card.rank]}"><span class="corner">${card.suit}${RANK_LABEL[card.rank]}</span><span class="big">${card.suit}</span></div>`;
+  const rank = RANK_LABEL[card.rank];
+  const s = card.suit;
+  let inner = "";
+  if (card.rank === 14) {
+    inner = `<div class="pips"><i class="pip big">${s}</i></div>`;
+  } else if (card.rank >= 11 && card.rank <= 13) {
+    inner = `<div class="face"><b>${rank}</b><i>${s}</i></div>`;
+  } else {
+    const cells = {};
+    (PIP_MAP[card.rank] || []).forEach(([r, col]) => { cells[r * 3 + col] = true; });
+    let pips = "";
+    for (let r = 0; r < 4; r++) {
+      for (let col = 0; col < 3; col++) {
+        pips += cells[r * 3 + col] ? `<i class="pip" style="grid-area:${r + 1}/${col + 1}">${s}</i>` : `<i class="pip" style="grid-area:${r + 1}/${col + 1};visibility:hidden;">${s}</i>`;
+      }
+    }
+    inner = `<div class="pips">${pips}</div>`;
+  }
+  return `<div class="${cls}${c}" data-suit="${s}" data-rank="${rank}"><span class="corner tl"><b>${rank}</b><i>${s}</i></span><span class="corner br"><b>${rank}</b><i>${s}</i></span>${inner}</div>`;
 }
 
 /* =====================================================================
@@ -784,7 +859,7 @@ function localNextTurn() {
   else setMsg("轮到你了。");
 }
 function clearLocalAutoNext() {
-  if (state.nextTimer) { clearTimeout(state.nextTimer); state.nextTimer = null; }
+  if (state.nextTimer) { clearTimeout(state.nextTimer); clearInterval(state.nextTimer); state.nextTimer = null; }
 }
 function showLocalModal(winner, myPts, lb) {
   const wName = winner === "me" ? "你" : localPlayer(winner).name;
@@ -802,11 +877,22 @@ function showLocalModal(winner, myPts, lb) {
   $("modal-score").innerHTML = myPts >= 0 ? `积分 <span style="color:#7dff9b">+${myPts}</span> · 总分 ${lb.score}` : `积分 <span style="color:#ff8a8a">${myPts}</span> · 总分 ${lb.score}`;
   state.round++;
   $("modal").classList.add("show");
-  // 自动下一把：结算后立刻自动开始下一局，无倒计时等待；弹窗保留展示结果，约2秒后自动关闭进入新局
+  // 结算停留5秒展示结果，之后由玩家点击「下一局」继续（不再自动开局/自动关闭）
   clearLocalAutoNext();
-  $("modal-countdown").textContent = "新一局已自动开始…";
-  if (state.phase !== "betting") startLocalRound();
-  state.nextTimer = setTimeout(() => { state.nextTimer = null; $("modal").classList.remove("show"); renderLocal(); }, 2000);
+  const nextBtn = $("modal-continue");
+  nextBtn.disabled = true;
+  let sec = 5;
+  $("modal-countdown").textContent = "本局结果展示中… " + sec + " 秒后可开始下一局";
+  state.nextTimer = setInterval(() => {
+    sec--;
+    if (sec > 0) {
+      $("modal-countdown").textContent = "本局结果展示中… " + sec + " 秒后可开始下一局";
+    } else {
+      clearInterval(state.nextTimer); state.nextTimer = null;
+      nextBtn.disabled = false;
+      $("modal-countdown").textContent = "点击「下一局」继续（赢家末位行动）";
+    }
+  }, 1000);
 }
 
 function aiAct(id) {
@@ -1142,6 +1228,12 @@ function handleHostMessage(conn, data) {
     renderOnlineRoom();
   } else if (data.type === "action") {
     handleHostAction(conn, data);
+  } else if (data.type === "next_round") {
+    // 仅结算后的赢家可发起下一局：关闭弹窗并开新局
+    if (ol.phase === "showdown" && data.seat === ol.winner && !ol.nextTimer) {
+      $("ol-modal").classList.remove("show");
+      hostNextRound();
+    }
   } else if (data.type === "pong") {
     // 保活
   }
@@ -1422,7 +1514,10 @@ function handleGuestMessage(data) {
     if (data.current !== undefined) ol.current = data.current;
     if (data.phase) ol.phase = data.phase;
     ol.firstRoundOver = false; ol.actedSet = {}; ol.roundStarter = ol.current;
-    // 不立即关闭结算弹窗，保持约2秒展示赢家与牌型后自动进入新局
+    ol.winner = null;
+    // 新一局已开始：关闭结算弹窗进入新局
+    clearOlAutoNext();
+    $("ol-modal").classList.remove("show");
     renderOnlineRoom();
   } else if (data.type === "err") { toast(data.msg); }
 }
@@ -1569,26 +1664,33 @@ function showOnlineModal(data) {
   // 显示按钮
   const nextBtn = $("ol-modal-next");
   nextBtn.style.display = "";
-  if (!ol.isHost) $("ol-modal-sub").textContent = "获胜者：" + data.winnerName + "（下一局自动开始）";
   $("ol-modal").classList.add("show");
-  // 自动下一把：结算后立刻自动开始下一局（房主发牌），无倒计时等待；弹窗保留展示结果，约2秒后自动关闭进入新局
+  // 结算停留5秒展示赢家与牌型；之后仅赢家可点击「下一局」开始，其余玩家等待赢家操作
   clearOlAutoNext();
   const cd = $("ol-modal-countdown");
-  if (ol.isHost) {
-    cd.textContent = "新一局已自动开始…";
-    if (ol.phase !== "betting") hostNextRound();
-  } else {
-    cd.textContent = "房主已自动开始下一局…";
-  }
-  ol.nextTimer = setTimeout(() => {
-    ol.nextTimer = null;
-    $("ol-modal").classList.remove("show");
-    renderOnlineRoom();
-  }, 2000);
+  const isWinner = data.winnerSeat === ol.mySeat;
+  nextBtn.disabled = true;
+  let sec = 5;
+  cd.textContent = "本局结果展示中… " + sec + " 秒后可开始下一局";
+  ol.nextTimer = setInterval(() => {
+    sec--;
+    if (sec > 0) {
+      cd.textContent = "本局结果展示中… " + sec + " 秒后可开始下一局";
+    } else {
+      clearInterval(ol.nextTimer); ol.nextTimer = null;
+      if (isWinner) {
+        nextBtn.disabled = false;
+        cd.textContent = "你是本局赢家，点击「下一局」开始";
+      } else {
+        nextBtn.style.display = "none";
+        cd.textContent = "等待赢家 " + data.winnerName + " 点击「下一局」…";
+      }
+    }
+  }, 1000);
 }
 
 function clearOlAutoNext() {
-  if (ol.nextTimer) { clearTimeout(ol.nextTimer); ol.nextTimer = null; }
+  if (ol.nextTimer) { clearTimeout(ol.nextTimer); clearInterval(ol.nextTimer); ol.nextTimer = null; }
 }
 
 function cleanupOnline() {
@@ -1610,6 +1712,7 @@ $("menu-online").addEventListener("click", () => {
   $("ol-lobby").style.display = "block";
   $("ol-room").style.display = "none";
   $("ol-status").textContent = "正在加载联机组件…";
+  renderOnlineHistory(); // 大厅展示对局历史（赢家 + 赢家牌型）
   ensurePeerJS(ok => {
     if (!ok) {
       $("ol-status").textContent = "";
@@ -1670,7 +1773,17 @@ $("ol-btn-compare").addEventListener("click", () => {
 });
 $("compare-cancel").addEventListener("click", localCancelCompare);
 $("ol-modal-close").addEventListener("click", () => $("ol-modal").classList.remove("show"));
-$("ol-modal-next").addEventListener("click", () => { $("ol-modal").classList.remove("show"); if (ol.isHost && ol.phase !== "betting") hostNextRound(); });
+$("ol-modal-next").addEventListener("click", () => {
+  // 仅结算后的赢家可点击「下一局」；按钮在倒计时结束前禁用，非赢家端按钮已隐藏
+  if (ol.winner !== ol.mySeat) return;
+  clearOlAutoNext();
+  $("ol-modal").classList.remove("show");
+  if (ol.isHost) {
+    if (ol.phase !== "betting") hostNextRound();
+  } else {
+    olSendToHost({ type: "next_round", seat: ol.mySeat });
+  }
+});
 
 /* =====================================================================
  * 积分榜
@@ -1704,7 +1817,7 @@ function openScoreModal(mode) {
       ${rows.length ? rows.map((r, i) => `<tr><td class="${i === 0 ? "rank1" : ""}">${i + 1}</td><td>${r.name}</td><td class="${r.score >= 0 ? "pos" : "neg"}">${r.score}</td><td>${r.games}</td><td>${r.wins}</td></tr>`).join("") : "<tr><td colspan='5' style='color:#8fae99;'>暂无联机记录</td></tr>"}
       </table>
       <div style="font-size:13px;color:#bcd9c5;margin:8px 0 4px;">最近战绩</div>
-      <div class="history-list">${b.history.length ? b.history.map(h => `<div>${h.t} · 胜者：${h.winner} · ${h.players.map(p => `${p.n} ${p.pts >= 0 ? "+" : ""}${p.pts}`).join("，")}</div>`).join("") : "<div>暂无记录</div>"}</div>`;
+      <div class="history-list">${b.history.length ? b.history.map(h => `<div>${h.t} · 胜者：${h.winner}${h.winnerHand ? `（${h.winnerHand}）` : ""} · ${h.players.map(p => `${p.n} ${p.pts >= 0 ? "+" : ""}${p.pts}`).join("，")}</div>`).join("") : "<div>暂无记录</div>"}</div>`;
   }
   $("score-modal").classList.add("show");
 }
