@@ -446,6 +446,20 @@ function peerConfig(extra) {
   const cfg = PEER_CFG.host ? { host: PEER_CFG.host, port: PEER_CFG.port, path: PEER_CFG.path, secure: PEER_CFG.secure } : {};
   return Object.assign(cfg, extra || {});
 }
+// Render 免费实例 15 分钟无流量会休眠，休眠期间 WebSocket 无法连上。
+// 进房/建房前先发一次 HTTP 请求把实例唤醒（请求成败都不阻塞，6 秒超时）。
+function wakeSignalServer() {
+  const proto = PEER_CFG.secure ? "https" : "http";
+  const port = PEER_CFG.port && PEER_CFG.port !== 443 && PEER_CFG.port !== 80 ? ":" + PEER_CFG.port : "";
+  const url = proto + "://" + PEER_CFG.host + port + (PEER_CFG.path || "/");
+  return new Promise(resolve => {
+    const ctl = new AbortController();
+    const timer = setTimeout(() => { try { ctl.abort(); } catch (e) {} resolve(); }, 6000);
+    fetch(url, { mode: "cors", cache: "no-store", signal: ctl.signal })
+      .catch(() => {})
+      .finally(() => { clearTimeout(timer); resolve(); });
+  });
+}
 
 /* ========== 联机不可用弹窗（明确提示，用户选择重试或返回人机） ========== */
 function showNetModal(msg) {
@@ -1152,6 +1166,7 @@ function createRoom(customCode) {
     $("ol-status").textContent = "";
   };
   const tryCreate = () => {
+    wakeSignalServer().then(() => {
     const peer = new Peer("zzhj-" + code, peerConfig());
     peer.on("open", id => {
       ol.isHost = true;
@@ -1199,6 +1214,7 @@ function createRoom(customCode) {
         showNetModal("无法连接联机服务器（" + err.type + "），创建房间失败。\n请检查网络后重试，或返回人机对战。");
       }
     });
+    });
   };
   tryCreate();
 }
@@ -1215,6 +1231,7 @@ function joinRoom() {
   const code = $("ol-code-input").value.trim().toUpperCase().replace(/\s+/g, "");
   if (!/^[A-Z0-9]{4,8}$/.test(code)) { toast("请输入4-8位房间码"); return; }
   $("ol-status").textContent = "正在连接房间 " + code + "…";
+  wakeSignalServer().then(() => {
   const peer = new Peer(peerConfig()); // 随机ID
   peer.on("open", id => {
     ol.peer = peer;
@@ -1237,6 +1254,7 @@ function joinRoom() {
       cleanupOnline();
       toast("未找到房间 " + code + "，请确认房间码");
     }
+  });
   });
 }
 
