@@ -592,6 +592,7 @@ class ManualConn {
 }
 
 let manualConns = []; // 房主已建立的多个手动连接
+let manualPendingConn = null; // 当前等待应答的连接对象
 function showManualModal(isHost) {
   $("manual-host-box").style.display = isHost ? "block" : "none";
   $("manual-guest-box").style.display = isHost ? "none" : "block";
@@ -633,6 +634,7 @@ function manualCreateRoom() {
   });
   conn.createInvite().then(code => {
     $("manual-invite").value = code;
+    manualPendingConn = conn;
     setManualStatus("邀请码已生成，复制发给好友");
   }).catch(e => { setManualStatus("生成失败：" + e.message); });
   $("manual-answer-input").value = "";
@@ -647,6 +649,7 @@ function manualMoreInvite() {
   setManualStatus("正在生成新邀请码…");
   conn.createInvite().then(code => {
     $("manual-invite").value = code;
+    manualPendingConn = conn;
     setManualStatus("新邀请码已生成，复制发给下一位好友");
   }).catch(e => { setManualStatus("生成失败：" + e.message); });
   $("manual-answer-input").value = "";
@@ -682,10 +685,10 @@ function manualAcceptAnswer() {
   const text = $("manual-answer-input").value.trim();
   if (!text) { toast("请先粘贴好友的应答码"); return; }
   setManualStatus("正在连接…");
-  const conn = manualConns.length ? manualConns[manualConns.length - 1] : null;
-  if (!conn) { setManualStatus("请先生成邀请码"); return; }
+  const conn = manualPendingConn;
+  if (!conn) { setManualStatus("请先生成邀请码，再把应答码粘贴到这里"); return; }
   conn.acceptAnswer(text).then(() => {
-    setManualStatus("已发送应答，等待好友确认…");
+    setManualStatus("已发送应答，正在建立连接…（好友应已进入房间）");
   }).catch(e => { setManualStatus("连接失败：" + e.message); });
 }
 
@@ -1988,6 +1991,7 @@ function cleanupOnline() {
   if (ol.peer) { try { ol.peer.destroy(); } catch (e) {} }
   manualConns.forEach(c => { try { if (c.pc) c.pc.close(); } catch (e) {} });
   manualConns = [];
+  manualPendingConn = null;
   if (ol.hostConn && ol.hostConn.pc) { try { ol.hostConn.pc.close(); } catch (e) {} }
   ol.peer = null; ol.conns = []; ol.hostConn = null; ol.isHost = false; ol.roomCode = "";
   ol.players = []; ol.cards = {}; ol.myCards = []; ol.mySeat = -1;
