@@ -283,11 +283,11 @@ body {
         <button class="btn" id="ol-join">加入房间</button>
       </div>
       <div class="ol-card">
-        <h3>🔄 手动连接（信令服务器连不上时用）</h3>
-        <p style="font-size:12px;color:#bcd9c5;margin-bottom:8px;">不依赖任何服务器，通过复制粘贴邀请码直连，国内任何网络都能用（适合 2-10 人好友局）</p>
+        <h3>🔄 无服务器联机（推荐，不用连服务器）</h3>
+        <p style="font-size:12px;color:#bcd9c5;margin-bottom:8px;">不依赖任何服务器，国内任何网络都能连。房主把「邀请码」发给朋友，朋友把「应答码」发回来，就开打！</p>
         <div style="display:flex;gap:8px;justify-content:center;">
-          <button class="btn" id="ol-manual-create" style="width:150px;">📋 我是房主</button>
-          <button class="btn" id="ol-manual-join" style="width:150px;">🔗 我是玩家</button>
+          <button class="btn" id="ol-manual-create" style="width:150px;">🏠 我是房主</button>
+          <button class="btn" id="ol-manual-join" style="width:150px;">🙋 我是玩家</button>
         </div>
       </div>
       <div class="ol-card">
@@ -387,24 +387,24 @@ body {
 <!-- 手动连接弹窗 -->
 <div class="modal-mask" id="manual-modal">
   <div class="modal" style="max-width:480px;">
-    <h2 id="manual-title">🔄 手动连接</h2>
+    <h2 id="manual-title">🔄 手动建房</h2>
     <div class="sub" id="manual-status" style="color:#ffd77a;min-height:20px;"></div>
     <div id="manual-host-box" style="display:none;text-align:left;">
-      <p style="font-size:12px;color:#bcd9c5;margin:6px 0;">① 把下面的邀请码复制发给一位好友（好友点「我是玩家」粘贴）：</p>
-      <textarea id="manual-invite" readonly style="width:100%;height:90px;font-size:11px;word-break:break-all;box-sizing:border-box;"></textarea>
+      <p style="font-size:13px;color:#bcd9c5;margin:8px 0;">第 1 步：点下面按钮，把「邀请码」复制下来，微信发给朋友 👇</p>
+      <textarea id="manual-invite" readonly placeholder="邀请码生成中…" style="width:100%;height:80px;font-size:11px;word-break:break-all;box-sizing:border-box;"></textarea>
       <div class="btn-row"><button class="btn" id="manual-copy-invite">📋 复制邀请码</button></div>
-      <p style="font-size:12px;color:#bcd9c5;margin:6px 0;">② 好友把应答码发回后，粘贴到这里并点连接：</p>
-      <textarea id="manual-answer-input" placeholder="粘贴好友的应答码…" style="width:100%;height:70px;font-size:11px;box-sizing:border-box;"></textarea>
+      <p style="font-size:13px;color:#bcd9c5;margin:8px 0;">第 2 步：朋友把「应答码」发回来后，粘贴到下面，点「连接」👇</p>
+      <textarea id="manual-answer-input" placeholder="粘贴朋友发来的应答码…" style="width:100%;height:70px;font-size:11px;box-sizing:border-box;"></textarea>
       <div class="btn-row"><button class="btn primary" id="manual-accept-answer">🔗 连接</button></div>
-      <p style="font-size:12px;color:#8fae99;margin:6px 0;">③ 连接建立后自动进入房间；要再邀请下一位好友，点下方「再邀请一位」重新生成邀请码。</p>
+      <p style="font-size:12px;color:#8fae99;margin:6px 0;">第 3 步：连上后自动开始打牌！还要叫别的朋友，就点下面👇</p>
       <div class="btn-row"><button class="btn" id="manual-more">➕ 再邀请一位</button></div>
     </div>
     <div id="manual-guest-box" style="display:none;text-align:left;">
-      <p style="font-size:12px;color:#bcd9c5;margin:6px 0;">① 粘贴房主发来的邀请码：</p>
-      <textarea id="manual-invite-input" placeholder="粘贴房主的邀请码…" style="width:100%;height:90px;font-size:11px;box-sizing:border-box;"></textarea>
-      <div class="btn-row"><button class="btn primary" id="manual-accept-invite">下一步：生成应答码</button></div>
-      <p style="font-size:12px;color:#bcd9c5;margin:6px 0;display:none;" id="manual-guest-answer-label">② 把下面的应答码复制发回给房主，等待房主确认连接：</p>
-      <textarea id="manual-answer" readonly style="width:100%;height:90px;font-size:11px;word-break:break-all;box-sizing:border-box;display:none;"></textarea>
+      <p style="font-size:13px;color:#bcd9c5;margin:8px 0;">第 1 步：把房主发的「邀请码」粘贴到下面，点「生成应答码」👇</p>
+      <textarea id="manual-invite-input" placeholder="粘贴房主发来的邀请码…" style="width:100%;height:80px;font-size:11px;box-sizing:border-box;"></textarea>
+      <div class="btn-row"><button class="btn primary" id="manual-accept-invite">📲 生成应答码</button></div>
+      <p style="font-size:13px;color:#bcd9c5;margin:8px 0;display:none;" id="manual-guest-answer-label">第 2 步：把下面的「应答码」复制，发回给房主，等他点「连接」就行👇</p>
+      <textarea id="manual-answer" readonly style="width:100%;height:80px;font-size:11px;word-break:break-all;box-sizing:border-box;display:none;"></textarea>
       <div class="btn-row"><button class="btn" id="manual-copy-answer" style="display:none;">📋 复制应答码</button></div>
     </div>
     <div class="btn-row"><button class="btn" id="manual-close">关闭</button></div>
@@ -520,74 +520,49 @@ const MANUAL_STUNS = [
   { urls: "stun:stun.cloudflare.com:3478" },
   { urls: "stun:stun.miwifi.com:3478" }
 ];
-function manualPeerConfig() { return { iceServers: MANUAL_STUNS }; }
-function waitIceGather(pc) {
-  return new Promise(resolve => {
-    if (pc.iceGatheringState === "complete") { resolve(); return; }
-    let done = false;
-    const fin = () => { if (!done) { done = true; resolve(); } };
-    pc.onicegatheringstatechange = () => { if (pc.iceGatheringState === "complete") fin(); };
-    setTimeout(fin, 5000);
-  });
-}
+const M_TAG = "M1:"; // 码前缀：M1 + SDP 原文，比 JSON 包装更短
 class ManualConn {
-  constructor() {
-    this.handlers = {};
-    this.pc = null;
-    this.ch = null;
-    this.pending = [];
-    this.opened = false;
-  }
+  constructor() { this.handlers = {}; this.pc = null; this.ch = null; this.pending = []; this.opened = false; }
   get open() { return this.opened; }
   close() { try { if (this.pc) this.pc.close(); } catch (e) {} this.opened = false; }
   on(ev, fn) { this.handlers[ev] = fn; }
-  emit(ev, ...args) { if (this.handlers[ev]) this.handlers[ev](...args); }
-  _makePeer() {
-    const pc = new RTCPeerConnection(manualPeerConfig());
+  emit(ev, ...a) { if (this.handlers[ev]) this.handlers[ev](...a); }
+  _pc() {
+    const pc = new RTCPeerConnection({ iceServers: MANUAL_STUNS });
     this.pc = pc;
-    pc.onconnectionstatechange = () => {
-      if (pc.connectionState === "failed" || pc.connectionState === "closed") {
-        if (this.opened && this.handlers.close) this.handlers.close();
-      }
-    };
+    pc.onconnectionstatechange = () => { if ((pc.connectionState === "failed" || pc.connectionState === "closed") && this.opened && this.handlers.close) this.handlers.close(); };
     return pc;
   }
-  _setupChannel(ch) {
+  _ch(ch) {
     this.ch = ch;
     ch.onopen = () => { this.opened = true; this.emit("open"); while (this.pending.length) ch.send(this.pending.shift()); };
-    ch.onmessage = e => { let d; try { d = JSON.parse(e.data); } catch (err) { return; } this.emit("data", d); };
+    ch.onmessage = e => { try { this.emit("data", JSON.parse(e.data)); } catch (err) {} };
     ch.onclose = () => { if (this.opened && this.handlers.close) this.handlers.close(); };
   }
-  send(obj) {
-    const s = JSON.stringify(obj);
-    if (this.ch && this.ch.readyState === "open") this.ch.send(s);
-    else this.pending.push(s);
+  send(o) {
+    const s = JSON.stringify(o);
+    if (this.ch && this.ch.readyState === "open") this.ch.send(s); else this.pending.push(s);
   }
+  _ice(pc) { return new Promise(r => { if (pc.iceGatheringState === "complete") return r(); let d = false; const f = () => { if (!d) { d = true; r(); } }; pc.onicegatheringstatechange = () => { if (pc.iceGatheringState === "complete") f(); }; setTimeout(f, 5000); }); }
   async createInvite() {
-    const pc = this._makePeer();
-    this._setupChannel(pc.createDataChannel("game"));
-    const offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
-    await waitIceGather(pc);
-    return JSON.stringify({ kind: "zzhj-manual", v: 1, sdp: pc.localDescription.sdp });
+    const pc = this._pc();
+    this._ch(pc.createDataChannel("game"));
+    await pc.setLocalDescription(await pc.createOffer());
+    await this._ice(pc);
+    return M_TAG + pc.localDescription.sdp;
   }
   async acceptInvite(text) {
-    let data;
-    try { data = JSON.parse(text); } catch (e) { throw new Error("邀请码格式不对，请完整复制"); }
-    if (!data || data.kind !== "zzhj-manual" || !data.sdp) throw new Error("不是有效的邀请码");
-    const pc = this._makePeer();
-    pc.ondatachannel = e => this._setupChannel(e.channel);
-    await pc.setRemoteDescription({ type: "offer", sdp: data.sdp });
-    const answer = await pc.createAnswer();
-    await pc.setLocalDescription(answer);
-    await waitIceGather(pc);
-    return JSON.stringify({ kind: "zzhj-manual", v: 1, sdp: pc.localDescription.sdp });
+    if (typeof text !== "string" || text.slice(0, 3) !== M_TAG) throw new Error("邀请码不对，请完整复制");
+    const pc = this._pc();
+    pc.ondatachannel = e => this._ch(e.channel);
+    await pc.setRemoteDescription({ type: "offer", sdp: text.slice(3) });
+    await pc.setLocalDescription(await pc.createAnswer());
+    await this._ice(pc);
+    return M_TAG + pc.localDescription.sdp;
   }
   async acceptAnswer(text) {
-    let data;
-    try { data = JSON.parse(text); } catch (e) { throw new Error("应答码格式不对，请完整复制"); }
-    if (!data || data.kind !== "zzhj-manual" || !data.sdp) throw new Error("不是有效的应答码");
-    await this.pc.setRemoteDescription({ type: "answer", sdp: data.sdp });
+    if (typeof text !== "string" || text.slice(0, 3) !== M_TAG) throw new Error("应答码不对，请完整复制");
+    await this.pc.setRemoteDescription({ type: "answer", sdp: text.slice(3) });
   }
 }
 
@@ -596,7 +571,7 @@ let manualPendingConn = null; // 当前等待应答的连接对象
 function showManualModal(isHost) {
   $("manual-host-box").style.display = isHost ? "block" : "none";
   $("manual-guest-box").style.display = isHost ? "none" : "block";
-  $("manual-title").textContent = isHost ? "🔄 手动建房（我是房主）" : "🔄 手动加入（我是玩家）";
+  $("manual-title").textContent = isHost ? "🔄 手动建房" : "🔄 手动加入";
   $("manual-status").textContent = "";
   $("manual-modal").classList.add("show");
 }
@@ -604,53 +579,38 @@ function hideManualModal() { $("manual-modal").classList.remove("show"); }
 function setManualStatus(msg) { $("manual-status").textContent = msg; }
 
 function manualCreateRoom() {
+  if (typeof RTCPeerConnection === "undefined") { toast("当前浏览器不支持 WebRTC，无法手动连接"); return; }
   cleanupOnline();
   applyPlayerName();
-  if (typeof RTCPeerConnection === "undefined") { toast("当前浏览器不支持 WebRTC，无法手动连接"); return; }
   showManualModal(true);
-  setManualStatus("正在生成邀请码…");
   manualConns = [];
+  manualNewInvite(true);
+}
+function manualMoreInvite() { manualNewInvite(false); }
+
+function manualNewInvite(isFirst) {
   const conn = new ManualConn();
   conn.on("data", data => handleHostMessage(conn, data));
   conn.on("close", () => handleHostLeave(conn));
   conn.on("open", () => {
-    if (!ol.isHost) {
+    if (isFirst && !ol.isHost) {
       // 首个玩家连上：初始化房主房间
-      ol.isHost = true;
-      ol.roomCode = "手动局";
-      ol.peer = null;
+      ol.isHost = true; ol.roomCode = "手动局"; ol.peer = null;
       ol.players = [{ seat: 0, name: ol.myName || loadPlayerName(), chips: 0, folded: false, out: false, online: true, looked: false, invested: 0, bet: 0, allIn: false }];
-      ol.mySeat = 0;
-      ol.conns = [];
-      $("ol-lobby").style.display = "none";
-      $("ol-room").style.display = "block";
-      $("ol-code-show").textContent = "手动局";
-      $("ol-role").textContent = "房主";
+      ol.mySeat = 0; ol.conns = [];
+      $("ol-lobby").style.display = "none"; $("ol-room").style.display = "block";
+      $("ol-code-show").textContent = "手动局"; $("ol-role").textContent = "房主";
       $("ol-status").textContent = "等待玩家加入…";
       toast("手动连接成功，好友已进入房间");
       renderOnlineRoom();
     }
     manualConns.push(conn);
   });
+  setManualStatus("正在生成邀请码…");
   conn.createInvite().then(code => {
     $("manual-invite").value = code;
     manualPendingConn = conn;
-    setManualStatus("邀请码已生成，复制发给好友");
-  }).catch(e => { setManualStatus("生成失败：" + e.message); });
-  $("manual-answer-input").value = "";
-  $("manual-answer-input").onpaste = () => {};
-}
-
-function manualMoreInvite() {
-  const conn = new ManualConn();
-  conn.on("data", data => handleHostMessage(conn, data));
-  conn.on("close", () => handleHostLeave(conn));
-  conn.on("open", () => { manualConns.push(conn); toast("新好友已连接"); });
-  setManualStatus("正在生成新邀请码…");
-  conn.createInvite().then(code => {
-    $("manual-invite").value = code;
-    manualPendingConn = conn;
-    setManualStatus("新邀请码已生成，复制发给下一位好友");
+    setManualStatus(isFirst ? "邀请码已生成！复制发给朋友" : "新邀请码已生成！复制发给下一位朋友");
   }).catch(e => { setManualStatus("生成失败：" + e.message); });
   $("manual-answer-input").value = "";
 }
@@ -661,13 +621,10 @@ function manualAcceptInvite() {
   setManualStatus("正在生成应答码…");
   const conn = new ManualConn();
   conn.on("open", () => {
-    ol.peer = null;
-    ol.roomCode = "手动局";
-    const c = conn;
-    ol.hostConn = c;
-    c.on("data", data => handleGuestMessage(data));
-    c.on("close", () => { toast("与房主连接断开，已返回菜单"); cleanupOnline(); showScreen("screen-menu"); updateMenuStats(); });
-    c.send({ type: "join", name: ol.myName });
+    ol.peer = null; ol.roomCode = "手动局"; ol.hostConn = conn;
+    conn.on("data", data => handleGuestMessage(data));
+    conn.on("close", () => { toast("与房主连接断开，已返回菜单"); cleanupOnline(); showScreen("screen-menu"); updateMenuStats(); });
+    conn.send({ type: "join", name: ol.myName });
     hideManualModal();
   });
   conn.acceptInvite(text).then(ans => {
@@ -677,18 +634,18 @@ function manualAcceptInvite() {
     $("manual-guest-answer-label").style.display = "block";
     $("manual-invite-input").style.display = "none";
     $("manual-accept-invite").style.display = "none";
-    setManualStatus("应答码已生成，复制发回给房主，等待连接…");
+    setManualStatus("应答码已生成！复制发回给房主");
   }).catch(e => { setManualStatus("生成失败：" + e.message); });
 }
 
 function manualAcceptAnswer() {
   const text = $("manual-answer-input").value.trim();
-  if (!text) { toast("请先粘贴好友的应答码"); return; }
-  setManualStatus("正在连接…");
+  if (!text) { toast("请先粘贴朋友的应答码"); return; }
   const conn = manualPendingConn;
-  if (!conn) { setManualStatus("请先生成邀请码，再把应答码粘贴到这里"); return; }
+  if (!conn) { setManualStatus("请先在上方生成邀请码，再把应答码粘贴到这里"); return; }
+  setManualStatus("正在连接…");
   conn.acceptAnswer(text).then(() => {
-    setManualStatus("已发送应答，正在建立连接…（好友应已进入房间）");
+    setManualStatus("已发送！等朋友进入房间就可以打牌了");
   }).catch(e => { setManualStatus("连接失败：" + e.message); });
 }
 
